@@ -1,0 +1,111 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-task-status/1.0.0
+name: FortiManager Task Status
+version: 1.0.0
+description: >
+  Generic poller for any FortiManager async task (script run, policy install,
+  device add, etc.). Supports one-shot status check or wait-until-done with
+  configurable timeout and poll interval. Returns state, percent, per-device
+  line results, and error counts. Designed to be reused by higher-level tools.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: monitor
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, task, polling, async, monitoring]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, task_id]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    task_id:
+      type: integer
+      description: Task ID returned by an exec call (e.g. script execute, policy install)
+    wait:
+      type: boolean
+      default: false
+      description: If true, poll until task reaches terminal state (done/error)
+    poll_interval_sec:
+      type: number
+      default: 2
+      description: Seconds between polls when wait=true
+    max_wait_sec:
+      type: integer
+      default: 120
+      description: Maximum total seconds to wait before returning partial result
+    include_lines:
+      type: boolean
+      default: true
+      description: Return per-device line results in response
+    include_history:
+      type: boolean
+      default: false
+      description: Return the full progress-event history (verbose)
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    task_id: {type: integer}
+    state: {type: string}
+    state_is_terminal: {type: boolean}
+    percent: {type: integer}
+    num_lines: {type: integer}
+    num_done: {type: integer}
+    num_err: {type: integer}
+    num_warn: {type: integer}
+    title: {type: string}
+    src: {type: string}
+    user: {type: string}
+    start_tm: {type: integer}
+    end_tm: {type: integer}
+    elapsed_sec: {type: integer}
+    waited_sec: {type: number}
+    timed_out: {type: boolean}
+    lines:
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          vdom: {type: string}
+          ip: {type: string}
+          state: {type: string}
+          percent: {type: integer}
+          detail: {type: string}
+          err: {type: integer}
+    history:
+      type: array
+      items:
+        type: object
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: api_token
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 180000

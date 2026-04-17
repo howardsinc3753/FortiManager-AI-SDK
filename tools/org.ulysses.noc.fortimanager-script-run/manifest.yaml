@@ -1,0 +1,123 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-script-run/1.0.0
+name: FortiManager Script Run
+version: 1.0.0
+description: >
+  Execute a pre-existing CLI script on FortiManager against a policy package,
+  a device+VDOM, multiple devices, or a device group. Optionally waits for
+  the task to complete and fetches the script output log. High-level wrapper
+  around /dvmdb/script/execute + /task/task polling + /dvmdb/script/log
+  retrieval. Requires the script to already exist on FMG.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: execute
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, script, cli, execute, orchestration]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, script]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      default: root
+      description: ADOM name (script must exist in this ADOM or be global)
+    script:
+      type: string
+      description: Name of the script (must already exist — create via /dvmdb/adom/{adom}/script)
+    scope_type:
+      type: string
+      enum: [package, device, group]
+      default: device
+      description: >
+        package = run script against a policy package (requires `package`).
+        device  = run against one or more device+vdom pairs (requires `scope`).
+        group   = run against one or more device groups (requires `groups`).
+    package:
+      type: string
+      description: Policy package name (when scope_type=package)
+    scope:
+      type: array
+      description: >
+        List of {name, vdom} pairs (when scope_type=device).
+        Example: [{"name": "fw-01", "vdom": "root"}]
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          vdom: {type: string}
+    groups:
+      type: array
+      description: Device group names (when scope_type=group), e.g. ["apac", "amer"]
+      items: {type: string}
+    wait:
+      type: boolean
+      default: true
+      description: Wait for task to finish and fetch log output
+    poll_interval_sec:
+      type: number
+      default: 2
+    max_wait_sec:
+      type: integer
+      default: 180
+    fetch_log:
+      type: boolean
+      default: true
+      description: After task completes, fetch the script output text (only used when wait=true)
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    task_id: {type: integer}
+    log_id: {type: integer}
+    script: {type: string}
+    adom: {type: string}
+    state: {type: string}
+    percent: {type: integer}
+    num_err: {type: integer}
+    num_done: {type: integer}
+    num_lines: {type: integer}
+    waited_sec: {type: number}
+    timed_out: {type: boolean}
+    lines:
+      type: array
+      items: {type: object}
+    log:
+      type: object
+      properties:
+        content: {type: string}
+        exec_time: {type: string}
+        script_name: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: api_token
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 240000

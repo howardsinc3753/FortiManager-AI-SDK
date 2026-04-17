@@ -181,7 +181,8 @@ class FortiManagerClient:
 
     def call(self, method: str, url: str, data: Optional[dict] = None,
              option: Optional[list] = None, fields: Optional[list] = None,
-             filter: Optional[list] = None, range: Optional[list] = None) -> dict:
+             filter: Optional[list] = None, range: Optional[list] = None,
+             verbose: Optional[int] = None) -> dict:
         """Generic JSON-RPC call.
 
         FMG GET supports extra param keys beyond `url`:
@@ -189,6 +190,9 @@ class FortiManagerClient:
           filter : nested list for server-side filtering, e.g. [["name","==","x"]]
           range  : [offset, limit] pagination, e.g. [0, 50]
           option : FMG options like ["object member","no loadsub","scope member"]
+
+        Envelope-level:
+          verbose: 1 → return symbolic (string) enums instead of ints
         """
         if self.auth_method == "session" and not self.session:
             self.login()
@@ -210,16 +214,19 @@ class FortiManagerClient:
         }
         if self.session:
             payload["session"] = self.session
+        if verbose is not None:
+            payload["verbose"] = verbose
         return self._request(payload)
 
     def get(self, url: str, fields: Optional[list] = None,
             filter: Optional[list] = None, range: Optional[list] = None,
-            option: Optional[list] = None) -> dict:
+            option: Optional[list] = None, verbose: Optional[int] = None) -> dict:
         return self.call("get", url, fields=fields, filter=filter,
-                         range=range, option=option)
+                         range=range, option=option, verbose=verbose)
 
-    def exec(self, url: str, data: Optional[dict] = None) -> dict:
-        return self.call("exec", url, data=data)
+    def exec(self, url: str, data: Optional[dict] = None,
+             verbose: Optional[int] = None) -> dict:
+        return self.call("exec", url, data=data, verbose=verbose)
 
     def set(self, url: str, data: dict) -> dict:
         return self.call("set", url, data=data)
