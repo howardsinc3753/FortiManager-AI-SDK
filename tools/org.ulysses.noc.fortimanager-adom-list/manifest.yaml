@@ -1,0 +1,72 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-adom-list/1.0.0
+name: FortiManager ADOM List
+version: 1.0.0
+description: >
+  List all Administrative Domains (ADOMs) on a FortiManager. Returns ADOM name,
+  OS version, state, and device count. Essential first step for MSSP workflows —
+  identifies the tenant scopes before drilling into devices or policies.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: discover
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, adom, mssp, multi-tenant, discovery]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP (looked up in fortimanager_credentials.yaml)
+    filter_state:
+      type: integer
+      description: Optional state filter (1=normal, 2=unknown). Omit for all.
+    name_like:
+      type: string
+      description: Optional substring filter on ADOM name (case-insensitive)
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    count: {type: integer}
+    adoms:
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          os_ver: {type: string}
+          mr: {type: integer}
+          state: {type: integer}
+          device_count: {type: integer}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: api_token
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000

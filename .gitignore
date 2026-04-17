@@ -1,0 +1,39 @@
+# Credentials & secrets — NEVER commit
+*_credentials.yaml
+*_credentials.yml
+*.pem
+*.key
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Trust Anchor submit helpers (never share private signing bits)
+submit_tool.py
+sign_*.py
+
+# Build / dist
+build/
+dist/
+*.egg-info/

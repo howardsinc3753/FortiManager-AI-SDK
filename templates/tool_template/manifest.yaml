@@ -1,0 +1,61 @@
+---
+canonical_id: {{CANONICAL_ID}}
+name: {{NAME}}
+version: 1.0.0
+description: >
+  TODO: one-paragraph description (20-500 chars) explaining what this tool does
+  and when a downstream agent should call it. Mention the FMG endpoint wrapped.
+status: draft
+
+metadata:
+  org_namespace: {{ORG}}
+  domain: {{DOMAIN}}
+  intent: discover          # discover | monitor | audit | troubleshoot | configure | remediate | execute | documentation
+  vendor: fortinet
+  shelf: {{DOMAIN}}/fortimanager
+  tags: [fortimanager, fmg, todo, todo]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP (looked up in fortimanager_credentials.yaml)
+    adom:
+      type: string
+      default: root
+      description: Administrative Domain name
+    # TODO: add tool-specific parameters
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    count: {type: integer}
+    # TODO: describe data fields your tool returns
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: api_token
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000      # discover/audit: 15000, configure/remediate: 60000, install: 300000
