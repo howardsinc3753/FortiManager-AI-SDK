@@ -1,5 +1,47 @@
 {
-  "endpoints": {},
+  "endpoints": {
+    "/dvmdb/script/execute": {
+      "raw_file": "dvmdb-script-execute.md",
+      "verbs": ["exec"],
+      "variants": [
+        "/dvmdb/script/execute",
+        "/dvmdb/global/script/execute",
+        "/dvmdb/adom/{adom}/script/execute"
+      ],
+      "returns": "task_id",
+      "companion_endpoints": ["/task/task/{taskid}", "/dvmdb/adom/{adom}/script/log/*"]
+    },
+    "/task/task": {
+      "raw_file": "task-task.md",
+      "verbs": ["get"],
+      "variants": [
+        "/task/task",
+        "/task/task/{taskid}",
+        "/task/task/{taskid}/line",
+        "/task/task/{taskid}/line/{line}",
+        "/task/task/{taskid}/line/{line}/history",
+        "/task/task/{taskid}/line/{line}/history/{history}"
+      ],
+      "purpose": "Async task monitoring — poll after any exec that returns a task ID"
+    },
+    "/dvmdb/adom/{adom}/script/log": {
+      "raw_file": "dvmdb-script-log.md",
+      "verbs": ["get"],
+      "variants": [
+        "/dvmdb/adom/{adom}/script/log/latest",
+        "/dvmdb/adom/{adom}/script/log/latest/device/{device}",
+        "/dvmdb/adom/{adom}/script/log/summary",
+        "/dvmdb/adom/{adom}/script/log/summary/device/{device}",
+        "/dvmdb/adom/{adom}/script/log/output/logid/{log_id}",
+        "/dvmdb/adom/{adom}/script/log/output/device/{device}/logid/{log_id}"
+      ],
+      "notes": "log_id = str(task_id) + ('1' for DB/package, '0' for device)"
+    },
+    "_conventions": {
+      "raw_file": "jsonrpc-conventions.md",
+      "purpose": "Cross-cutting: multiplexing, verbose, fields/filter/range, unset, task pattern"
+    }
+  },
   "last_updated": "2026-04-17",
   "notes": "Add entries as raw/ files are dropped. See README.md for format."
 }
