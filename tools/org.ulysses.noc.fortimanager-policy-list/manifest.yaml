@@ -1,0 +1,103 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-policy-list/1.0.0
+name: FortiManager Policy List
+version: 1.0.0
+description: >
+  List firewall policies within a specific policy package in an ADOM. Returns
+  policy ID, name, source/destination interfaces and addresses, service, action,
+  NAT, and status. Supports pagination via offset/limit for large rulebases.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: discover
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, firewall, policy, rules, audit]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, package]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      default: root
+      description: Administrative Domain
+    package:
+      type: string
+      description: Policy package name (get via fortimanager-policy-package-list)
+    name_like:
+      type: string
+      description: Optional substring filter on policy name
+    action_filter:
+      type: string
+      enum: [accept, deny, any]
+      default: any
+      description: Filter by action (accept=1, deny=0 in FMG)
+    only_enabled:
+      type: boolean
+      default: false
+      description: Return only policies with status=1 (enabled)
+    offset:
+      type: integer
+      default: 0
+      description: Pagination offset
+    limit:
+      type: integer
+      default: 100
+      description: Max policies to return (range [offset, limit])
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    count: {type: integer}
+    package: {type: string}
+    policies:
+      type: array
+      items:
+        type: object
+        properties:
+          policyid: {type: integer}
+          name: {type: string}
+          srcintf: {type: array, items: {type: string}}
+          dstintf: {type: array, items: {type: string}}
+          srcaddr: {type: array, items: {type: string}}
+          dstaddr: {type: array, items: {type: string}}
+          service: {type: array, items: {type: string}}
+          schedule: {type: array, items: {type: string}}
+          action: {type: integer}
+          action_label: {type: string}
+          status: {type: integer}
+          nat: {type: integer}
+          uuid: {type: string}
+          comments: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: api_token
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000

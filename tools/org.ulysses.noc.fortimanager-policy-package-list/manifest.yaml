@@ -1,0 +1,80 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-policy-package-list/1.0.0
+name: FortiManager Policy Package List
+version: 1.0.0
+description: >
+  List firewall policy packages in an ADOM. Returns package name, type
+  (pkg/folder), object version, and package settings (NAT mode, implicit log,
+  NGFW mode). Used before drilling into per-package policies or installs.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: discover
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, policy, package, firewall]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      default: root
+      description: Administrative Domain to scope results
+    name_like:
+      type: string
+      description: Optional case-insensitive substring filter on package name
+    include_folders:
+      type: boolean
+      default: true
+      description: Include folder-type entries (nested package containers)
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    count: {type: integer}
+    packages:
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          type: {type: string}
+          oid: {type: integer}
+          obj_version: {type: integer}
+          central_nat: {type: integer}
+          ngfw_mode: {type: integer}
+          consolidated_firewall_mode: {type: integer}
+          implicit_log: {type: integer}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: api_token
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000

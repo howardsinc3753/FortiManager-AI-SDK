@@ -1,0 +1,88 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-device-list/1.0.0
+name: FortiManager Device List
+version: 1.0.0
+description: >
+  List FortiGate devices managed by a FortiManager, optionally scoped to an ADOM.
+  Returns name, IP, platform, FortiOS version, HA mode, connection status, and
+  config-sync status. Primary discovery tool for fleet inventory and health
+  triage across MSSP tenants.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: discover
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, device, inventory, mssp, fleet]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP (looked up in fortimanager_credentials.yaml)
+    adom:
+      type: string
+      default: root
+      description: Administrative Domain to scope results
+    name_like:
+      type: string
+      description: Optional case-insensitive substring filter on device name
+    platform_like:
+      type: string
+      description: Optional case-insensitive substring filter on platform (e.g. "60F")
+    only_down:
+      type: boolean
+      default: false
+      description: If true, return only devices with conn_status != 1 (not up)
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    count: {type: integer}
+    devices:
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          hostname: {type: string}
+          ip: {type: string}
+          platform: {type: string}
+          os_version: {type: string}
+          build: {type: integer}
+          ha_mode: {type: integer}
+          conn_status: {type: integer}
+          conn_status_label: {type: string}
+          conf_status: {type: integer}
+          mgt_vdom: {type: string}
+          description: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: api_token
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000
