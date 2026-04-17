@@ -167,13 +167,27 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
             "interfaces": interfaces,
         }
         if not interfaces:
-            out["note"] = (
-                "No RTM data returned. FMG's Real-Time Monitor must be polling "
-                "this device. If the device was recently added, allow 5-15min "
-                "for data to appear. For live current state, use "
-                "fortimanager-device-monitor-proxy with "
-                "/api/v2/monitor/virtual-wan/health-check."
-            )
+            window_sec = end_tm - start_tm
+            if window_sec < 300:
+                out["note"] = (
+                    f"No RTM samples in this narrow {window_sec}s window. "
+                    "FMG RTM writes per-minute buckets — try a wider window "
+                    "(e.g. time_window_sec=900 for 15 minutes) before concluding "
+                    "RTM is not populated. If wider windows also return empty, "
+                    "SD-WAN Monitoring History may not be enabled: "
+                    "'config system admin setting / set sdwan-monitor-history enable'. "
+                    "For live current state, use fortimanager-device-monitor-proxy "
+                    "with /api/v2/monitor/virtual-wan/health-check."
+                )
+            else:
+                out["note"] = (
+                    f"No RTM data in a {window_sec}s window. SD-WAN Monitoring "
+                    "History is likely not enabled on FMG. Enable via: "
+                    "'config system admin setting / set sdwan-monitor-history enable', "
+                    "then wait 5-15min. For live current state right now, use "
+                    "fortimanager-device-monitor-proxy with "
+                    "/api/v2/monitor/virtual-wan/health-check."
+                )
         return out
 
     except Exception as e:
