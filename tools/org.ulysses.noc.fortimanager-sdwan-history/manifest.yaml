@@ -1,0 +1,101 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-sdwan-history/1.0.0
+name: FortiManager SD-WAN History
+version: 1.0.0
+description: >
+  Fetch historical SD-WAN telemetry from FortiManager's Real-Time Monitor (RTM)
+  store. Two metric modes — sla (jitter/latency/packetloss/link state) and
+  interface (bandwidth/bytes). Time-window convenience (last N seconds) or
+  explicit start/end. Returns per-interface time-series samples plus AI-friendly
+  summary roll-ups (averages, maxes, link-up percentage). Pair with
+  device-monitor-proxy for live current state.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: monitor
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, sdwan, monitoring, sla, bandwidth, rtm, history]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, device, metric]
+  properties:
+    fmg_host: {type: string}
+    device: {type: string, description: "Managed device name"}
+    metric:
+      type: string
+      enum: [sla, interface]
+      description: >
+        sla       = jitter, latency, packetloss, link state (per SLA monitor + interface).
+        interface = bandwidth + byte counters (per interface).
+    time_window_sec:
+      type: integer
+      default: 3600
+      description: "Last N seconds relative to now. Ignored if start_tm provided."
+    start_tm:
+      type: integer
+      description: "Explicit unix start timestamp (optional)"
+    end_tm:
+      type: integer
+      description: "Explicit unix end timestamp (optional, default now)"
+    interfaces:
+      type: array
+      items: {type: string}
+      description: "Optional client-side filter — only include these interface names"
+    max_samples_per_interface:
+      type: integer
+      default: 200
+      description: "Cap per-interface time-series length to keep output manageable"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    device: {type: string}
+    metric: {type: string}
+    window:
+      type: object
+      properties:
+        start: {type: integer}
+        end: {type: integer}
+        duration_sec: {type: integer}
+    entry_count: {type: integer}
+    interfaces:
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          sla_name: {type: string}
+          sample_count: {type: integer}
+          samples: {type: array, items: {type: object}}
+          summary: {type: object}
+    note: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 30000
