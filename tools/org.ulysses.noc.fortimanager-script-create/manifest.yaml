@@ -1,0 +1,97 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-script-create/1.0.0
+name: FortiManager Script Create
+version: 1.0.0
+description: >
+  Create or update a FortiManager CLI script in an ADOM. Wraps the GUI-verified
+  URL pm/config/adom/{adom}/obj/fmg/script (not the legacy /dvmdb/... path).
+  Supports target = remote_device | device_database | adom_database, and
+  script types cli / tcl / cligrp. Required by fortimanager-script-run, which
+  can only execute scripts that already exist.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, script, cli, create, authoring]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name, content]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      default: root
+      description: ADOM to create the script in
+    name:
+      type: string
+      description: Script name (must be unique within the ADOM, max 71 chars)
+    content:
+      type: string
+      description: Script body (FortiOS CLI or TCL depending on type)
+    target:
+      type: string
+      enum: [remote_device, device_database, adom_database]
+      default: remote_device
+      description: >
+        remote_device    = SSH into live FortiGate and run CLI
+        device_database  = run against FMG's cached device config
+        adom_database    = run against ADOM config database (package scope)
+    type:
+      type: string
+      enum: [cli, tcl, cligrp]
+      default: cli
+      description: cli = FortiOS CLI script; tcl = Tcl script; cligrp = CLI group
+    desc:
+      type: string
+      default: ""
+      description: Human-readable description (max 128 chars)
+    overwrite:
+      type: boolean
+      default: false
+      description: If true and script exists, update it instead of failing
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    canonical_id: {type: string}
+    script:
+      type: object
+      properties:
+        name: {type: string}
+        adom: {type: string}
+        target: {type: string}
+        type: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000
