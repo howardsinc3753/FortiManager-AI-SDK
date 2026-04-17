@@ -1,0 +1,73 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-object-member-update/1.0.0
+name: FortiManager Object Member Update
+version: 1.0.0
+description: >
+  Atomic member operations for FMG group-type objects (address groups, service
+  groups, VIP groups, internet-service groups). Modes: add, remove, clear.
+  Uses the /member sub-path with method=add or method=delete to avoid the
+  FMG table-wipe gotcha that set on a group can trigger. Clear uses method=
+  unset for full member wipe.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, member, group, addrgrp, vipgrp, servicegrp]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, url, mode]
+  properties:
+    fmg_host: {type: string}
+    url:
+      type: string
+      description: >
+        Full path to the /member sub-resource. Examples:
+          /pm/config/adom/{adom}/obj/firewall/addrgrp/{name}/member
+          /pm/config/adom/{adom}/obj/firewall/vipgrp/{name}/member
+          /pm/config/adom/{adom}/obj/firewall/service/group/{name}/member
+    mode:
+      type: string
+      enum: [add, remove, clear]
+      description: "add = append members; remove = drop named members; clear = wipe all"
+    members:
+      type: array
+      items: {type: string}
+      description: "Member names (required for add/remove; ignored for clear)"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    url: {type: string}
+    members_affected: {type: array, items: {type: string}}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000

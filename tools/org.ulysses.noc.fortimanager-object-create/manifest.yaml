@@ -1,0 +1,80 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-object-create/1.0.0
+name: FortiManager Object Create
+version: 1.0.0
+description: >
+  Generic CRUD create for ANY FortiManager object type. Takes a collection URL
+  plus data dict; posts via method=add. Handles special-character escaping in
+  entity names. Optionally checks pre-existence and returns 'noop' when
+  overwrite=false. Replaces needing per-type create tools — address, vip,
+  addrgrp, service, schedule, wildcard-fqdn, etc. all use this one primitive.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, crud, create, generic, object, authoring]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, url, data]
+  properties:
+    fmg_host: {type: string}
+    url:
+      type: string
+      description: >
+        Collection URL for the object type. Examples:
+          /pm/config/adom/{adom}/obj/firewall/address
+          /pm/config/adom/{adom}/obj/firewall/vip
+          /pm/config/adom/{adom}/obj/firewall/addrgrp
+          /pm/config/adom/{adom}/obj/firewall/service/custom
+          /pm/config/adom/{adom}/obj/firewall/schedule/onetime
+          /pm/config/adom/{adom}/obj/firewall/wildcard-fqdn/custom
+          /pm/config/adom/{adom}/pkg/{pkg}/firewall/policy
+    data:
+      type: object
+      description: "Object body (must include 'name' for named tables). Use object-schema to discover fields."
+    overwrite:
+      type: boolean
+      default: false
+      description: "If true and entity with same name exists, PUT (update) instead of error"
+    as_list:
+      type: boolean
+      default: false
+      description: "Some FMG tables require data wrapped in a list. Rare; enable if you hit -10 Invalid data."
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    url: {type: string}
+    name: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000

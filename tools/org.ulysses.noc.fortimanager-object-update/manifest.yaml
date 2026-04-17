@@ -1,0 +1,70 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-object-update/1.0.0
+name: FortiManager Object Update
+version: 1.0.0
+description: >
+  Partial update of any existing FMG object via method=update on a named-entity
+  URL. Only the fields in `data` are modified; other fields are preserved.
+  Handles special-character name escaping automatically. Works across every
+  FortiManager object type — address, vip, addrgrp, policy, service, etc.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, crud, update, generic, object, edit]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, url, data]
+  properties:
+    fmg_host: {type: string}
+    url:
+      type: string
+      description: >
+        Named-entity URL (with the object name at the end). Examples:
+          /pm/config/adom/{adom}/obj/firewall/address/web-01
+          /pm/config/adom/{adom}/obj/firewall/vip/vip-01
+          /pm/config/adom/{adom}/pkg/{pkg}/firewall/policy/7
+        Slash-in-name handled automatically — pass the literal name, tool escapes.
+    data:
+      type: object
+      description: "Only fields to change. Everything else preserved."
+    unset_attrs:
+      type: array
+      items: {type: string}
+      description: "Optional list of attribute names to clear back to default"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    url: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000

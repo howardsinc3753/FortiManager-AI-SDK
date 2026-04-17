@@ -1,0 +1,81 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-metadata-set-device/1.0.0
+name: FortiManager Metadata Set Device
+version: 1.0.0
+description: >
+  Assign per-device values to an FMG metadata variable via the dynamic_mapping
+  sub-path. One call can set values for multiple device+vdom scopes. This is
+  the MSSP templating superpower — one policy package + per-device variable
+  overrides = customized deploys at scale.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, metadata, variable, per-device, mssp, templating]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name, mappings]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, default: root}
+    name:
+      type: string
+      description: "Variable name (must already exist — create via metadata-create)"
+    mappings:
+      type: array
+      description: "Per-device overrides"
+      items:
+        type: object
+        required: [device, value]
+        properties:
+          device: {type: string, description: "Managed device name"}
+          vdom: {type: string, default: global, description: "'global' for device scope or a VDOM name"}
+          value: {type: string, description: "Override value (MUST be a string)"}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    name: {type: string}
+    adom: {type: string}
+    applied_count: {type: integer}
+    results:
+      type: array
+      items:
+        type: object
+        properties:
+          device: {type: string}
+          vdom: {type: string}
+          value: {type: string}
+          success: {type: boolean}
+          error: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 30000

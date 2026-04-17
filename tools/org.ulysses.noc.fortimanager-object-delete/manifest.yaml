@@ -1,0 +1,63 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-object-delete/1.0.0
+name: FortiManager Object Delete
+version: 1.0.0
+description: >
+  Delete any FMG object (address, VIP, policy, addrgrp, service, schedule,
+  etc.) via method=delete on a named-entity URL. Includes an optional
+  pre-existence check that returns a clean noop instead of failing when the
+  object is already absent — useful for idempotent cleanup flows.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: remediate
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, crud, delete, generic, object, remove]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, url]
+  properties:
+    fmg_host: {type: string}
+    url:
+      type: string
+      description: "Named-entity URL (ending with the object name/id to delete)"
+    idempotent:
+      type: boolean
+      default: true
+      description: "If true, return success=true + action=noop when object already absent. Set false to fail on missing."
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    url: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000

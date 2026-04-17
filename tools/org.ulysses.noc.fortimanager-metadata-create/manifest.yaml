@@ -1,0 +1,64 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-metadata-create/1.0.0
+name: FortiManager Metadata Create
+version: 1.0.0
+description: >
+  Create a FortiManager metadata variable (fmg/variable) in an ADOM with a
+  default value. Variables are the MSSP templating mechanism — one policy
+  package can reference {{VAR}} values that get substituted per-device at
+  install time. Pair with metadata-set-device to assign per-device values.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, metadata, variable, templating, mssp]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name, default_value]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, default: root}
+    name: {type: string, description: "Variable name (referenced as $(NAME) in templates)"}
+    default_value:
+      type: string
+      description: "Default value (MUST be a string per FMG API requirement — even for numeric values)"
+    description: {type: string, default: ""}
+    overwrite: {type: boolean, default: false}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    name: {type: string}
+    adom: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000
