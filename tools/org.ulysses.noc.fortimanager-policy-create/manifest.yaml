@@ -1,0 +1,104 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-policy-create/1.0.0
+name: FortiManager Policy Create
+version: 1.0.0
+description: >
+  Create a firewall policy inside a policy package. References existing address,
+  service, and schedule objects by name (FMG uses name-based refs, not IDs).
+  Returns the auto-assigned policyid. Pair with firewall-address-list and
+  policy-package-list to discover valid object/package names first.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, firewall, policy, rules, authoring]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, package, srcintf, dstintf, srcaddr, dstaddr, service]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, default: root}
+    package: {type: string, description: "Policy package name"}
+    name: {type: string, description: "Policy name (optional but recommended)"}
+    srcintf:
+      type: array
+      items: {type: string}
+      description: "Source interface name(s), e.g. ['port1'] or ['any']"
+    dstintf:
+      type: array
+      items: {type: string}
+      description: "Destination interface name(s)"
+    srcaddr:
+      type: array
+      items: {type: string}
+      description: "Source address object name(s), e.g. ['RFC1918-10']"
+    dstaddr:
+      type: array
+      items: {type: string}
+      description: "Destination address object name(s)"
+    service:
+      type: array
+      items: {type: string}
+      description: "Service object name(s), e.g. ['ALL','HTTPS']"
+    schedule:
+      type: array
+      items: {type: string}
+      default: [always]
+      description: "Schedule object name(s) (default 'always')"
+    action:
+      type: string
+      enum: [accept, deny, ipsec, ssl-vpn]
+      default: accept
+    status:
+      type: string
+      enum: [enable, disable]
+      default: enable
+    nat:
+      type: string
+      enum: [enable, disable]
+      default: disable
+    logtraffic:
+      type: string
+      enum: [disable, utm, all]
+      default: utm
+    comments: {type: string, default: ""}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    policyid: {type: integer}
+    name: {type: string}
+    adom: {type: string}
+    package: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000

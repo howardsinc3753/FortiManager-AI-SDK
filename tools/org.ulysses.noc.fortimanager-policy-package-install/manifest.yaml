@@ -1,0 +1,89 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-policy-package-install/1.0.0
+name: FortiManager Policy Package Install
+version: 1.0.0
+description: >
+  Install a policy package (and pending device settings) to one or more target
+  devices. Wraps exec /securityconsole/install/package, which returns a task ID
+  asynchronously. Optionally waits for the install task to complete. Primary
+  MSSP operation: push tenant rulebase changes to live FortiGates.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: execute
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, install, package, policy, push, mssp]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, adom, package, scope]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, default: root}
+    package: {type: string, description: "Policy package name"}
+    scope:
+      type: array
+      description: "Target devices + VDOMs, e.g. [{name: 'fw-01', vdom: 'root'}]"
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          vdom: {type: string}
+    flags:
+      type: array
+      items: {type: string}
+      default: [none]
+      description: "Install flags: 'none' (default), 'preview', 'install_chkpt', 'copy_assigned_pkg', etc."
+    dev_rev_comments:
+      type: string
+      default: "Installed via FortiManager AI SDK"
+      description: "Device revision comment"
+    wait: {type: boolean, default: true}
+    poll_interval_sec: {type: number, default: 3}
+    max_wait_sec: {type: integer, default: 300}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    task_id: {type: integer}
+    adom: {type: string}
+    package: {type: string}
+    state: {type: string}
+    percent: {type: integer}
+    num_err: {type: integer}
+    num_done: {type: integer}
+    num_lines: {type: integer}
+    waited_sec: {type: number}
+    timed_out: {type: boolean}
+    lines:
+      type: array
+      items: {type: object}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 360000

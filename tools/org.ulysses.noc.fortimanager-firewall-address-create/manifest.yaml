@@ -1,0 +1,77 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-firewall-address-create/1.0.0
+name: FortiManager Firewall Address Create
+version: 1.0.0
+description: >
+  Create a firewall address object (ipmask / iprange / fqdn) in an ADOM. Uses
+  add (not set) to avoid the FMG table-wipe gotcha documented in the API guide.
+  Validates input per address type. Supports overwrite=true for idempotent
+  automation.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, firewall, address, create, object]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name, type]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, default: root}
+    name: {type: string, description: "Object name (unique within ADOM)"}
+    type:
+      type: string
+      enum: [ipmask, iprange, fqdn]
+      description: "Address type"
+    subnet:
+      type: string
+      description: "CIDR (e.g. 10.1.1.0/24) or IP/netmask — required when type=ipmask"
+    start_ip: {type: string, description: "Required when type=iprange"}
+    end_ip: {type: string, description: "Required when type=iprange"}
+    fqdn: {type: string, description: "Required when type=fqdn"}
+    associated_interface:
+      type: array
+      items: {type: string}
+      description: "Restrict address to specific interface(s); empty = any"
+    comment: {type: string, default: "", description: "Max 255 chars"}
+    color: {type: integer, default: 0, description: "Icon color 1-32 (0 = default)"}
+    overwrite: {type: boolean, default: false, description: "If true and object exists, update it"}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    name: {type: string}
+    adom: {type: string}
+    type: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000

@@ -1,0 +1,92 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-device-monitor-proxy/1.0.0
+name: FortiManager Device Monitor Proxy
+version: 1.0.0
+description: >
+  Proxy any FortiGate REST monitor endpoint through FortiManager via exec
+  /sys/proxy/json. Lets AI query live device state (interfaces, sessions,
+  routing, policy stats, health) without needing direct credentials on each
+  FortiGate. Massive MSSP leverage — one FMG credential unlocks live visibility
+  across every managed tenant.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: monitor
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, proxy, monitor, fortigate, passthrough, live]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, resource, targets]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, default: root}
+    resource:
+      type: string
+      description: "FortiGate REST API path starting with /api/v2/, e.g. /api/v2/monitor/system/interface"
+    action:
+      type: string
+      enum: [get, post, put, delete]
+      default: get
+      description: "HTTP verb the proxy should forward"
+    targets:
+      type: array
+      items: {type: string}
+      description: >
+        List of FMG target paths. Examples:
+          '/adom/root/device/howard-sdwan-spoke-1'
+          '/adom/root/group/All_FortiGate'
+          '/adom/dc_emea/group/All_FortiGate'
+    payload:
+      type: object
+      description: "Request body when action is post/put"
+    timeout_sec:
+      type: integer
+      default: 30
+      description: "Per-target timeout hint (FMG may cap this internally)"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    resource: {type: string}
+    target_count: {type: integer}
+    success_count: {type: integer}
+    results:
+      type: array
+      items:
+        type: object
+        properties:
+          target: {type: string}
+          success: {type: boolean}
+          http_status: {type: integer}
+          response: {type: object}
+          error: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 60000

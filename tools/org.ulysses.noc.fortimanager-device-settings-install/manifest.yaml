@@ -1,0 +1,85 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-device-settings-install/1.0.0
+name: FortiManager Device Settings Install
+version: 1.0.0
+description: >
+  Push pending device-scope settings (interface, DNS, SNMP, system) to managed
+  FortiGates WITHOUT installing policies. Wraps exec /securityconsole/install/
+  device. Use this when only device-level config changed and policy package
+  install is not needed. Async — returns task ID; optionally waits for completion.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: execute
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, install, device, settings, system, push]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, scope]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, default: root}
+    scope:
+      type: array
+      description: "Target devices + VDOMs"
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          vdom: {type: string}
+    flags:
+      type: array
+      items: {type: string}
+      default: [none]
+    dev_rev_comments:
+      type: string
+      default: "Device settings installed via FortiManager AI SDK"
+    wait: {type: boolean, default: true}
+    poll_interval_sec: {type: number, default: 3}
+    max_wait_sec: {type: integer, default: 300}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    task_id: {type: integer}
+    adom: {type: string}
+    state: {type: string}
+    percent: {type: integer}
+    num_err: {type: integer}
+    num_done: {type: integer}
+    num_lines: {type: integer}
+    waited_sec: {type: number}
+    timed_out: {type: boolean}
+    lines:
+      type: array
+      items: {type: object}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 360000

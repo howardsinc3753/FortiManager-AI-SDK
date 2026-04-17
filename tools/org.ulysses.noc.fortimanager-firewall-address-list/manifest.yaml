@@ -1,0 +1,81 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-firewall-address-list/1.0.0
+name: FortiManager Firewall Address List
+version: 1.0.0
+description: >
+  List firewall address objects in an ADOM. Returns name, type (ipmask/iprange/
+  fqdn/geography/dynamic), subnet / ip range / fqdn, associated interface, UUID,
+  and color. Supports filtering by name substring and type. Essential discovery
+  step before creating policies that reference addresses.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: discover
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, firewall, address, object, policy]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host]
+  properties:
+    fmg_host: {type: string, description: "FortiManager hostname or IP"}
+    adom: {type: string, default: root, description: "ADOM name"}
+    name_like: {type: string, description: "Case-insensitive substring match on name"}
+    type_filter:
+      type: string
+      enum: [any, ipmask, iprange, fqdn, geography, dynamic]
+      default: any
+      description: "Filter by address type"
+    offset: {type: integer, default: 0}
+    limit: {type: integer, default: 200}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    count: {type: integer}
+    adom: {type: string}
+    addresses:
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          type: {type: integer}
+          type_label: {type: string}
+          subnet: {type: array, items: {type: string}}
+          start_ip: {type: string}
+          end_ip: {type: string}
+          fqdn: {type: string}
+          associated_interface: {type: array, items: {type: string}}
+          color: {type: integer}
+          comment: {type: string}
+          uuid: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 15000
