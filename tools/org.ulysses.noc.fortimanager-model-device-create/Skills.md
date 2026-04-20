@@ -34,7 +34,7 @@ Use this tool when:
 
 ## Known Gotchas
 
-- **VM platforms often blocked**: `FortiGate-VM64-KVM` returns `code: -20084 'VM device is not allowed'` unless FortiFlex entitlement is applied. Use HW platforms for staging.
+- **VM platforms require real FortiFlex serials**: `FortiGate-VM64-KVM` with a *synthetic* serial returns `code: -20084 'VM device is not allowed'` because FMG can't validate against FortiCloud/FortiFlex entitlement. A REAL FortiFlex-issued VM serial (typically `FGVMULTM...` / `FGVMELTM...`) is accepted — the error is a validation gate, not a platform block. HW platforms (`FortiGate-60F` etc.) work with synthetic or real serials.
 - **Delete uses different endpoint**: `exec /dvm/cmd/del/device` (not `delete /dvmdb/...`) — generic `object-delete` returns `code -9` on DVM devices.
 
 ## Interpreting Results
@@ -72,7 +72,7 @@ execute_certified_tool(
 
 | Error | Meaning | Fix |
 |---|---|---|
-| `FMG exec error: {'code': -20084, ...}` | VM platform blocked by license | Use HW platform or apply FortiFlex entitlement |
+| `FMG exec error: {'code': -20084, ...}` | FMG couldn't validate the VM serial against FortiFlex | Use a REAL FortiFlex-issued VM serial OR switch to HW platform with synthetic SN |
 | `FMG exec error: {'code': -3, ...}` | ADOM doesn't exist | Create ADOM first |
 | `Device not in DVM after create` | Task completed but DVM didn't populate | Check FMG logs |
 

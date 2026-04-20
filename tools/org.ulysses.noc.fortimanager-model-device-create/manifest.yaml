@@ -4,11 +4,9 @@ name: FortiManager Model Device Create
 version: 1.0.0
 description: >
   Create a placeholder model device in FMG DVM via exec /dvm/cmd/add/dev-list
-  with action=add_model. Model devices let MSSPs stage config (SDWAN template,
-  system profile, policy package) BEFORE a physical FortiGate arrives on site.
-  When the real device phones home via FGFM, FMG pushes the pre-staged config.
-  Supports HW platforms (e.g. FortiGate-60F, FortiGate-201F); VM platforms are
-  typically blocked by license (FMG returns -20084).
+  (action=add_model). Stages config BEFORE hardware arrives; FGFM pushes it
+  when device phones home. Supports HW platforms with any serial, and VM
+  platforms with real FortiFlex-issued serials (synthetic VM SNs → -20084).
 status: draft
 
 metadata:
