@@ -112,7 +112,8 @@ See `playbooks/` folder:
 | Built | `sdwan-health-check.md` | Live + historical SD-WAN health snapshot |
 | Built | `sdwan-config-audit.md` | Read-only SD-WAN config grade (zones, members, health-checks, services, neighbors) vs MSSP best practices |
 | Built | `sdwan-spoke-onboard.md` | Build SD-WAN config on a spoke from scratch — zones, members, health-checks, ADVPN neighbor — with dry-run + rollback |
-| Planned | `tenant-onboarding.md` | Device blueprint + metadata + policy install |
+| Built | `tenant-sdwan-onboarding.md` | **FMG-native MSSP tenant onboarding**: ADOM + SDWAN Template + model devices (HW) + BGP-on-Lo (tag-resolve-mode=merge) + install staging. Policy package deferred. |
+| Planned | `tenant-onboarding.md` (full) | Adds policy package authoring on top of sdwan onboarding |
 | Planned | `security-posture-audit.md` | Policy hygiene + live hit stats |
 | Planned | `mssp-change-detection.md` | Version/checksum drift loop for drift alerts |
 
