@@ -1,0 +1,112 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-model-device-create/1.0.0
+name: FortiManager Model Device Create
+version: 1.0.0
+description: >
+  Create a placeholder model device in FMG DVM via exec /dvm/cmd/add/dev-list
+  with action=add_model. Model devices let MSSPs stage config (SDWAN template,
+  system profile, policy package) BEFORE a physical FortiGate arrives on site.
+  When the real device phones home via FGFM, FMG pushes the pre-staged config.
+  Supports HW platforms (e.g. FortiGate-60F, FortiGate-201F); VM platforms are
+  typically blocked by license (FMG returns -20084).
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, model, device, staging, dvm, ztp, mssp, onboarding]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, adom, name, sn, platform]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, description: "ADOM to register the device in"}
+    name:
+      type: string
+      description: "Device name in FMG (e.g. 'spoke-05'). Used as mkey for later operations."
+    sn:
+      type: string
+      description: "Device serial number. For HW: real serial OR synthetic (e.g. FGT60FTK12345678). For VM: typically blocked by license."
+    platform:
+      type: string
+      description: "FortiGate platform string. HW examples: 'FortiGate-60F', 'FortiGate-201F', 'FortiWiFi-50G-5G'. VM: 'FortiGate-VM64-KVM' (license-gated)."
+    os_type:
+      type: integer
+      default: 0
+      description: "OS type: 0=FortiOS (default)"
+    os_ver:
+      type: integer
+      default: 7
+      description: "Major FOS version (e.g. 7 for 7.x)"
+    mr:
+      type: integer
+      default: 6
+      description: "Minor FOS version (e.g. 6 for 7.6)"
+    adm_usr:
+      type: string
+      default: admin
+      description: "Admin username FMG will use over FGFM"
+    description:
+      type: string
+      default: ""
+      description: "Free-form description"
+    mgmt_mode:
+      type: integer
+      default: 3
+      description: "Management mode: 3 = FGFM (default for SD-WAN staging)"
+    blueprint:
+      type: string
+      description: "Optional: device blueprint name to apply (from /pm/devprof)"
+    extra_commands:
+      type: array
+      description: >
+        Optional list of follow-on API calls to execute as part of model device
+        creation (e.g. pre-populate metadata variable dynamic_mappings). Each
+        entry is a full JSON-RPC param dict with method + url + data.
+      items: {type: object}
+    wait:
+      type: boolean
+      default: true
+      description: "Poll the returned task until terminal state"
+    max_wait_sec:
+      type: integer
+      default: 60
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    name: {type: string}
+    adom: {type: string}
+    task_id: {type: integer}
+    state: {type: string}
+    device_oid: {type: integer}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 120000
