@@ -29,12 +29,42 @@ Use this tool when:
 | `max_rows` | integer | No | `10000` | Cap |
 | `preview_rows` | integer | No | `5` | Preview rows shown in response |
 
-## Common URLs
+## Device Export Scope (3 modes)
+
+The `url` parameter controls scope. Pick the right one:
+
+| Scope | URL | Returns |
+|---|---|---|
+| **Fleet-wide** (every FortiGate across every ADOM) | `/dvmdb/device` | All managed devices in one combined list — MSSP-wide inventory |
+| **Per-tenant** (one customer / one ADOM) | `/dvmdb/adom/{adom}/device` | Just that ADOM's FortiGates |
+| **Single device** | `/dvmdb/adom/{adom}/device/{name}` | One device's full record |
+
+### Per-Tenant Loop Pattern
+
+If the user wants ONE CSV per ADOM (typical MSSP monthly report deliverable):
+
+```python
+# 1. List all ADOMs
+adoms = adom-list({"fmg_host": fmg})
+
+# 2. Loop and export per-ADOM
+for a in adoms["adoms"]:
+    export-csv({
+        "fmg_host": fmg,
+        "url": f"/dvmdb/adom/{a['name']}/device",
+        "fields": ["name","ip","platform_str","os_ver","conn_status"],
+        "verbose": 1,
+        "output_path": f"C:/Reports/{a['name']}_devices.csv"
+    })
+```
+
+Result: `Customer_101_devices.csv`, `Customer_102_devices.csv`, etc.
+
+## Other Common URLs
 
 | Use case | URL |
 |---|---|
-| Devices in ADOM | `/dvmdb/adom/{adom}/device` |
-| All ADOMs | `/dvmdb/adom` |
+| All ADOMs (just metadata, not devices) | `/dvmdb/adom` |
 | Firewall addresses | `/pm/config/adom/{adom}/obj/firewall/address` |
 | Custom services | `/pm/config/adom/{adom}/obj/firewall/service/custom` |
 | Policies in a package | `/pm/config/adom/{adom}/pkg/{pkg}/firewall/policy` |
