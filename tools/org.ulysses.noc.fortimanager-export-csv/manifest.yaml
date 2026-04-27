@@ -1,0 +1,92 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-export-csv/1.0.0
+name: FortiManager Export CSV
+version: 1.0.0
+description: >
+  Fetch any FMG table and write the rows as CSV. FMG has no native CSV export
+  endpoint — the GUI does client-side conversion. This tool replicates that:
+  pulls JSON via /pm/.../obj or /dvmdb/... or any list-returning URL, then
+  emits CSV either to a file path or as a preview string.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: discover
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, csv, export, reporting, audit]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, url]
+  properties:
+    fmg_host: {type: string}
+    url:
+      type: string
+      description: >
+        Any FMG list URL — examples:
+          /dvmdb/adom/{adom}/device
+          /dvmdb/adom
+          /pm/config/adom/{adom}/obj/firewall/address
+          /pm/config/adom/{adom}/pkg/{pkg}/firewall/policy
+    fields:
+      type: array
+      items: {type: string}
+      description: "Limit columns to this list. If omitted, dump all keys present in row 0."
+    filter:
+      type: array
+      description: "Server-side filter passthrough, e.g. [['type','==',0]]"
+    range:
+      type: array
+      description: "[offset, limit] pagination"
+    verbose:
+      type: integer
+      description: "1 = symbolic enums (string) instead of ints"
+    output_path:
+      type: string
+      description: "Absolute path to write CSV. If omitted, returns preview string only."
+    max_rows:
+      type: integer
+      default: 10000
+      description: "Cap on rows fetched"
+    preview_rows:
+      type: integer
+      default: 5
+      description: "Rows to include in `csv_preview` when output_path not set"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    url: {type: string}
+    row_count: {type: integer}
+    columns: {type: array, items: {type: string}}
+    output_path: {type: string}
+    bytes_written: {type: integer}
+    csv_preview: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: ["{output_path}"]
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 30000

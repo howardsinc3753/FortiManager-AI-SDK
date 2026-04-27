@@ -17,6 +17,7 @@ Outcomes you can deliver today:
 | **Count anything** — "how many policies does tenant X have?" | `object-count` | — |
 | **Schema introspection** — "what fields does a VIP object have?" | `object-schema` | — |
 | **Reference discovery** — "what are valid values for policy.srcaddr?" | `field-datasrc` | — |
+| **Export anything to CSV** — devices, addresses, policies, services, ADOMs, metadata vars | `export-csv` | — |
 | **Policy review with readable names** | `object-list` with `expand_datasrc` | — |
 | **Security posture audit** — orphans, overly-permissive rules, unused objects | `object-list`, `object-count`, `policy-list`, `device-monitor-proxy` | `security-posture-audit.md` |
 
