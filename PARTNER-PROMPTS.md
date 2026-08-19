@@ -41,7 +41,7 @@ Procedure:
      - output_schema: addresses array with {name, type, subnet, fqdn, uuid}
   3. Implement execute() using FortiManagerClient. Use `fields=[...]` to limit payload.
   4. Fill Skills.md — 3+ example prompts, real JSON output from smoke test, 3 error rows.
-  5. Smoke test: python tools/.../*.py 192.168.215.17
+  5. Smoke test: python tools/.../*.py fmg.example.com
   6. Validate: python scripts/validate_tool.py tools/org.{ORG}.noc.fortimanager-firewall-address-list
   7. Report pass/fail. If fail, fix and re-validate. Do not claim done until it passes.
 

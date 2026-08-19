@@ -114,7 +114,7 @@ Replace placeholders. Critical:
 ## 7. Smoke-test
 
 ```bash
-python tools/<canonical_dir>/<canonical_dir>.py 192.168.215.17
+python tools/<canonical_dir>/<canonical_dir>.py fmg.example.com
 ```
 
 Expect `"success": true`. If you see `FMG {'code': -11, ...}` — the admin profile's `rpc-permit` is disabled for this resource.

@@ -132,7 +132,7 @@ def main(context) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     import json
-    host = sys.argv[1] if len(sys.argv) > 1 else "192.168.215.17"
+    host = sys.argv[1] if len(sys.argv) > 1 else "fmg.example.com"
     print(json.dumps(asyncio.run(execute({"fmg_host": host})), indent=2))
 ```
 

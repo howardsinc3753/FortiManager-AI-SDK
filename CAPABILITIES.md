@@ -1,9 +1,12 @@
 # Capabilities — What This SDK Can Do
 
-**AI: read this file at session start. When the user asks "what can you do?" or describes an operational problem, map their language to the capabilities below and propose 1-3 concrete options.** Don't dump the full list at once — pick what fits the user's context.
+The **outcome-oriented** index of what you (or an AI agent using this SDK) can accomplish today.
 
-This is the **outcome-oriented** index. For the primitives themselves, see `tools/`.
-For executable step-by-step workflows, see `playbooks/`.
+- For the tool primitives themselves, see [`tools/`](tools/).
+- For executable step-by-step workflows composing multiple tools, see [`playbooks/`](playbooks/).
+- For a 5-minute getting-started, see [QUICKSTART.md](QUICKSTART.md).
+
+> **Note for AI assistants:** this file is optimized for you. When a user describes an operational problem, map their language to the capability rows below and propose 1–3 concrete options. Don't dump the full list — pick what fits their context. Guidance is at the bottom under [How the AI Should Use This Index](#-how-the-ai-should-use-this-index).
 
 ---
 
