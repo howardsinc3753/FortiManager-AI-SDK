@@ -1,12 +1,12 @@
 ---
-canonical_id: org.ulysses.noc.fortimanager-model-device-create/1.0.0
+canonical_id: org.ulysses.noc.fortimanager-model-device-create/2.0.0
 name: FortiManager Model Device Create
-version: 1.0.0
+version: 2.0.0
 description: >
-  Create a placeholder model device in FMG DVM via exec /dvm/cmd/add/dev-list
-  (action=add_model). Stages config BEFORE hardware arrives; FGFM pushes it
-  when device phones home. Supports HW platforms with any serial, and VM
-  platforms with real FortiFlex-issued serials (synthetic VM SNs → -20084).
+  Create a placeholder model device in FMG DVM via exec /dvm/cmd/add/device.
+  Comprehensive rewrite (v2) targeting FMG 7.6.7 daemon API. Attaches templates,
+  policy package, auth template, and per-device metadata variables in a single
+  call via the inline device-blueprint object. Supports HW and VM platforms.
 status: draft
 
 metadata:
@@ -15,7 +15,7 @@ metadata:
   intent: configure
   vendor: fortinet
   shelf: noc/fortimanager
-  tags: [fortimanager, fmg, model, device, staging, dvm, ztp, mssp, onboarding]
+  tags: [fortimanager, fmg, model, device, blueprint, ztp, mssp, onboarding, template]
 
 runtime:
   language: python
@@ -30,67 +30,99 @@ parameters:
   required: [fmg_host, adom, name, sn, platform]
   properties:
     fmg_host: {type: string}
-    adom: {type: string, description: "ADOM to register the device in"}
-    name:
-      type: string
-      description: "Device name in FMG (e.g. 'spoke-05'). Used as mkey for later operations."
+    adom: {type: string, description: "ADOM to register device in"}
+    name: {type: string, description: "Device name in FMG (used as mkey for later ops)"}
     sn:
       type: string
-      description: "Device serial number. For HW: real serial OR synthetic (e.g. FGT60FTK12345678). For VM: typically blocked by license."
+      description: "Serial number. HW: real or synthetic. VM: must be FortiFlex-issued (synthetic returns -20084)."
     platform:
       type: string
-      description: "FortiGate platform string. HW examples: 'FortiGate-60F', 'FortiGate-201F', 'FortiWiFi-50G-5G'. VM: 'FortiGate-VM64-KVM' (license-gated)."
+      description: "FortiGate model. HW: 'FortiGate-30G', 'FortiGate-50G', 'FortiGate-120G'. VM: 'FortiGate-VM64-KVM' etc."
     os_type:
-      type: integer
-      default: 0
-      description: "OS type: 0=FortiOS (default)"
+      type: [string, integer]
+      default: fos
+      description: "OS type. String: fos|fsw|foc|fml|faz|fwb|fct|fmg|fsa|fac|fpx. Int: 0=fos. Auto-mapped."
     os_ver:
-      type: integer
+      type: [string, integer]
       default: 7
-      description: "Major FOS version (e.g. 7 for 7.x)"
+      description: "OS major version. String: '7.0'|'8.0'. Int: 7|8. Auto-mapped."
     mr:
       type: integer
       default: 6
-      description: "Minor FOS version (e.g. 6 for 7.6)"
-    adm_usr:
-      type: string
-      default: admin
-      description: "Admin username FMG will use over FGFM"
-    description:
-      type: string
-      default: ""
-      description: "Free-form description"
+      description: "OS minor version (e.g. 6 for 7.6.x)"
+    patch:
+      type: integer
+      default: 0
+      description: "OS patch level"
     mgmt_mode:
-      type: integer
-      default: 3
-      description: "Management mode: 3 = FGFM (default for SD-WAN staging)"
-    blueprint:
+      type: [string, integer]
+      default: fmg
+      description: "Mgmt mode. String: unreg|fmg|faz|fmgfaz. Int: 0=unreg, 3=fmg, 1=faz, 2=fmgfaz. Auto-mapped."
+    adm_usr: {type: string, default: admin, description: "Admin username FMG will use over FGFM"}
+    adm_pass:
       type: string
-      description: "Optional: device blueprint name to apply (from /pm/devprof)"
-    extra_commands:
-      type: array
+      description: "Admin password. Optional for model devices (used when real device connects)."
+    description: {type: string, default: "", description: "Free-form description"}
+    faz_perm: {type: integer, default: 15, description: "FortiAnalyzer permissions bitmask (15 = all)"}
+    faz_quota: {type: integer, default: 0, description: "FortiAnalyzer log quota MB (0 = no quota)"}
+    blueprint:
+      oneOf:
+        - {type: string, description: "Legacy: blueprint/devprof name to reference"}
+        - {type: object, description: "Full inline device-blueprint dict (7.6.7 style)"}
       description: >
-        Optional list of follow-on API calls to execute as part of model device
-        creation (e.g. pre-populate metadata variable dynamic_mappings). Each
-        entry is a full JSON-RPC param dict with method + url + data.
-      items: {type: object}
-    wait:
-      type: boolean
-      default: true
-      description: "Poll the returned task until terminal state"
-    max_wait_sec:
+        Device blueprint. Pass a string to reference an existing devprof by name,
+        OR pass a dict with full inline blueprint fields:
+        {platform, port-provisioning, vm-log-disk, linked-to-model, prefer-img-ver,
+        download_from_fgd, enforce-device-config, sdwan-management, folder,
+        auth-template, prerun-cliprof, pkg, cluster-worker, templates}
+    templates:
+      type: array
+      items: {type: string}
+      description: "Shortcut: CLI template groups to attach (populates blueprint.templates). Order-preserved."
+    pkg:
+      type: string
+      description: "Shortcut: policy package name to attach (populates blueprint.pkg)"
+    auth_template:
+      type: string
+      description: "Shortcut: fabric authorization template name (populates blueprint.auth-template)"
+    enforce_device_config:
       type: integer
-      default: 60
+      default: 0
+      description: "0 = advisory (device can drift), 1 = enforced from templates"
+    sdwan_management:
+      type: integer
+      default: 0
+      description: "0 = off, 1 = FMG owns SDWAN config"
+    meta_variables:
+      type: object
+      additionalProperties: {type: string}
+      description: "Per-device metadata var overrides ({VAR_NAME: value}). Requires vars to exist via metadata-create."
+    meta_fields:
+      type: object
+      additionalProperties: {type: string}
+      description: "Meta fields (device-info tags: Address, Contact, Company, etc.)"
+    groups:
+      type: array
+      items: {type: string}
+      description: "Device group names to assign the device into on create"
+    wait: {type: boolean, default: true, description: "Poll task to terminal state"}
+    max_wait_sec: {type: integer, default: 60}
+    dry_run:
+      type: boolean
+      default: false
+      description: "If true, build the payload and return it without POSTing to FMG"
 
 output_schema:
   type: object
   properties:
     success: {type: boolean}
+    action: {type: string, enum: [created, dry-run, already-exists]}
     name: {type: string}
     adom: {type: string}
     task_id: {type: integer}
     state: {type: string}
     device_oid: {type: integer}
+    payload_sent: {type: object}
     error: {type: string}
 
 credentials:
