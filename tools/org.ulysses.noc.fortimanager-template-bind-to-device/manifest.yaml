@@ -1,0 +1,78 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-template-bind-to-device/1.0.0
+name: FortiManager Template Bind To Device
+version: 1.0.0
+description: >
+  Bind a provisioning template (System / CLI Template Group / SDWAN) to a
+  device or model device in FMG by merging the device into the template's
+  scope-member array. Preserves existing bindings (read-merge-write), dedupes
+  by (name, vdom), and supports dry_run for pre-flight inspection.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, template, bind, scope-member, provisioning]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, template_type, template_name, device]
+  properties:
+    fmg_host: {type: string, description: "FMG hostname/IP"}
+    adom: {type: string, default: root, description: "Target ADOM"}
+    template_type:
+      type: string
+      enum: [system, cli-group, sdwan]
+      description: "system=Device Profile, cli-group=CLI Template Group, sdwan=SDWAN Template"
+    template_name: {type: string, description: "Existing template name"}
+    device: {type: string, description: "Device name (real or model device in ADOM)"}
+    vdom: {type: string, default: root, description: "VDOM name to bind"}
+    dry_run:
+      type: boolean
+      default: false
+      description: "If true, return the payload that would be POSTed without calling FMG"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string}
+    template_type: {type: string}
+    template_name: {type: string}
+    adom: {type: string}
+    device: {type: string}
+    vdom: {type: string}
+    scope_members_after: {type: integer}
+    would_bind_device: {type: string}
+    would_bind_vdom: {type: string}
+    existing_scope_members: {type: array}
+    new_scope_members: {type: array}
+    endpoint_used: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000

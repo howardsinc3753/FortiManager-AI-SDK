@@ -1,0 +1,95 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-sdwan-template-create/1.0.0
+name: FortiManager SD-WAN Template Create
+version: 1.0.0
+description: >
+  Create (or update) a FortiManager 7.6 SD-WAN Template — the first-class
+  provisioning object that binds zones, members, health-checks, service rules
+  and BGP-on-Lo neighbors. Accepts nested arrays verbatim so the caller can
+  drive full spoke or hub payloads (including $(METAVAR) references) in one
+  call. Supports overwrite=true for idempotent MSSP rollout.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, sdwan, template, provisioning]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name]
+  properties:
+    fmg_host: {type: string, description: "FortiManager hostname or IP"}
+    adom: {type: string, default: root, description: "Target ADOM"}
+    name: {type: string, description: "SD-WAN template name (unique within ADOM)"}
+    status:
+      type: string
+      enum: [enable, disable]
+      default: enable
+      description: "Template status"
+    zone:
+      type: array
+      description: "Zone definitions. Each item: {name, advpn_select, advpn_health_check, ...}"
+      items: {type: object}
+    members:
+      type: array
+      description: "Member definitions. Each item: {seq_num, interface, zone, source, ...}"
+      items: {type: object}
+    health_check:
+      type: array
+      description: "Health-check definitions. Each item: {name, server, members, sla, ...}. Maps to FMG 'health-check'."
+      items: {type: object}
+    service:
+      type: array
+      description: "Service rule definitions. Each item: {id, name, dst, src, priority_members, ...}"
+      items: {type: object}
+    neighbor:
+      type: array
+      description: "BGP-on-Lo neighbor definitions. Each item: {ip, member, health_check, ...}"
+      items: {type: object}
+    description: {type: string, default: "", description: "Free-text description"}
+    overwrite:
+      type: boolean
+      default: false
+      description: "If true and template exists, update via update on the named URL"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string, description: "created | updated | noop"}
+    name: {type: string}
+    adom: {type: string}
+    zone_count: {type: integer}
+    member_count: {type: integer}
+    health_check_count: {type: integer}
+    service_count: {type: integer}
+    neighbor_count: {type: integer}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 30000

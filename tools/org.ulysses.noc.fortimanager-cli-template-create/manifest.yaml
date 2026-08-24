@@ -1,0 +1,87 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-cli-template-create/1.0.0
+name: FortiManager CLI Template Create
+version: 1.0.0
+description: >
+  Create or update a FortiManager CLI Template (FMG 7.6 /pm/config/.../obj/cli/template).
+  Accepts a multi-line CLI or Jinja2 body via the 'script' parameter and stores it as
+  the workhorse template that FMG assigns to Model Devices for BGP, IPsec, static
+  routes, interfaces, and platform-specific FortiGate provisioning (30G/50G/120G/VM).
+  Idempotent via overwrite=true. Handles both int and string 'type' encodings per FMG build.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, template, cli, jinja, provisioning]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name, script]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      default: root
+      description: Target ADOM (tenant scope)
+    name:
+      type: string
+      description: CLI template name (unique within ADOM)
+    script:
+      type: string
+      description: >
+        CLI or Jinja2 template body. Multi-line strings are preserved verbatim.
+        FMG metadata variables use $(VAR) syntax, e.g. set hostname "$(HOSTNAME)".
+    type:
+      type: string
+      enum: [cli, jinja]
+      default: cli
+      description: cli = plain FortiOS CLI (int 0); jinja = Jinja2 template (int 1)
+    description:
+      type: string
+      default: ""
+      description: Free-text description shown in FMG GUI
+    overwrite:
+      type: boolean
+      default: false
+      description: If true and template exists, update it instead of failing
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string, description: "created | updated | noop"}
+    name: {type: string}
+    adom: {type: string}
+    type: {type: string}
+    script_lines: {type: integer}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 30000

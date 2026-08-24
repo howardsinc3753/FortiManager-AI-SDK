@@ -61,6 +61,21 @@ Outcomes you can deliver today:
 
 ---
 
+## 🟣 Provisioning Templates (Author + Bind)
+
+FMG-native template authoring for ZTP model devices and MSSP tenant rollouts.
+
+| Capability | Tools used | Playbook |
+|---|---|---|
+| **Author a System Template** (Device Profile) — hostname / DNS / NTP / syslog / SNMP container | `system-template-create` | — |
+| **Author a CLI Template** — any raw CLI or Jinja2 body with `$(VAR)` metadata refs. Covers BGP / IPsec / Static Route / Interface configs. | `cli-template-create` | — |
+| **Bundle CLI Templates in order** — install-time execution sequence (e.g. System → Interface → Static → IPsec → BGP → SDWAN) | `cli-template-group-create` | — |
+| **Author an SDWAN Template** — WAN Profile with zones / members / health-checks / services / ADVPN neighbors | `sdwan-template-create` | `sdwan-spoke-onboard.md`, `tenant-sdwan-onboarding.md` |
+| **Bind template to device** — attach System / CLI-Group / SDWAN template to a device or model device (merge semantics, dry-run supported) | `template-bind-to-device` | — |
+| **Full MSSP spoke build** — metadata vars → templates → model device → bind → install | `metadata-create`, `cli-template-create`, `sdwan-template-create`, `template-bind-to-device`, `model-device-create`, `device-settings-install` | `tenant-sdwan-onboarding.md` |
+
+---
+
 ## 🔵 Monitor (Live + Historical)
 
 | Capability | Tools used | Playbook |

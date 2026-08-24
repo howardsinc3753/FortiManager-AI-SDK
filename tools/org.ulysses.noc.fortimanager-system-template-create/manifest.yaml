@@ -1,0 +1,65 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-system-template-create/1.0.0
+name: FortiManager System Template Create
+version: 1.0.0
+description: >
+  Create (or update) a FortiManager Device Profile / System Template — the
+  container that binds hostname, DNS, NTP, admin, syslog and SNMP settings to
+  a managed device. First template family in the SD-WAN build sequence.
+  Supports overwrite=true for idempotent provisioning.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, template, system, devprof, provisioning]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name]
+  properties:
+    fmg_host: {type: string, description: "FortiManager hostname or IP"}
+    adom: {type: string, default: root, description: "Target ADOM name"}
+    name: {type: string, description: "System template name (unique within ADOM)"}
+    description: {type: string, default: "", description: "Free-text description"}
+    overwrite:
+      type: boolean
+      default: false
+      description: "If true and template exists, update via update on the named URL"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string, description: "created | updated | noop"}
+    name: {type: string}
+    adom: {type: string}
+    endpoint_used: {type: string, description: "The devprof URL variant that worked"}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000
