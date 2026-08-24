@@ -2,7 +2,7 @@
 
 > **AI-ready FortiManager JSON-RPC SDK** — Trust-Anchor-certified MCP tool framework for MSSP partners. Fork the namespace, feed prompts to Claude Code / Cursor, ship tools that pass validation on the first try.
 
-Python SDK plus a 33-tool MCP collection covering discovery, authoring, change, execute, monitor, and provisioning-template operations against FortiManager 7.6. Built for MSSP partners who operate managed FortiGate fleets through AI agents.
+Python SDK plus a 34-tool MCP collection covering discovery, authoring, change, execute, monitor, and provisioning-template operations against FortiManager 7.6. Built for MSSP partners who operate managed FortiGate fleets through AI agents.
 
 **License:** Apache 2.0 — see [LICENSE](LICENSE).
 
@@ -54,7 +54,7 @@ Full walkthrough: **[QUICKSTART.md](QUICKSTART.md)**.
 
 ---
 
-## Tool inventory (33 tools)
+## Tool inventory (34 tools)
 
 Canonical prefix: `org.ulysses.noc.fortimanager-*` (fork this to your org via [NAMESPACE-FORK.md](NAMESPACE-FORK.md))
 
@@ -116,15 +116,16 @@ Live and historical operational state.
 |---|---|
 | `object-delete` (see Configure above) | Also usable for cleanup / remediation flows |
 
-### 🟣 Provisioning Templates — 5 tools
-FMG-native template authoring for ZTP model devices and MSSP tenant onboarding.
+### 🟣 Provisioning Templates — 6 tools
+FMG-native template authoring for ZTP model devices and MSSP tenant onboarding. Covers BOTH the legacy family-specific templates (System / CLI / CLI Group / SDWAN) AND the new-style unified "Recommended Templates" family (IPsec / BGP / Static Route / SD-WAN Overlay / FortiAP).
 
 | Tool | Purpose |
 |---|---|
-| `system-template-create` | Create System Template (Device Profile) — the container for hostname/DNS/NTP/admin/syslog/SNMP settings |
-| `cli-template-create` | Author a CLI Template (plain CLI or Jinja2 body with `$(VAR)` metadata refs) — the workhorse for Interface / BGP / IPsec / Static Route / any raw CLI |
-| `cli-template-group-create` | Create an ordered CLI Template Group (install-time execution order preserved) |
-| `sdwan-template-create` | Create an SDWAN Template (WAN Profile) with nested zones / members / health-checks / services / neighbors |
+| `system-template-create` | Create System Template (Device Profile) — hostname/DNS/NTP/admin/syslog/SNMP container. Endpoint: `/pm/devprof/adom/{adom}` |
+| `cli-template-create` | Author a CLI Template (plain CLI or Jinja2 body with `$(VAR)` metadata refs) — workhorse for any raw CLI. Endpoint: `/pm/config/adom/{adom}/obj/cli/template` |
+| `cli-template-group-create` | Ordered CLI Template Group (install-time execution order preserved). Endpoint: `/pm/config/adom/{adom}/obj/cli/template-group` |
+| `sdwan-template-create` | SDWAN Template (WAN Profile) with nested zones / members / health-checks / services / neighbors. Endpoint: `/pm/wanprof/adom/{adom}` |
+| `provisioning-template-create` | **UNIFIED** — creates ANY of: IPsec Tunnel (`_ipsec`), BGP (`router_bgp`), Static Route (`_router_static`), SD-WAN Overlay (`_sdwan_overlay`), FortiAP (`_fap_setting`) via one tool. Endpoint: `/pm/template/{stype}/adom/{adom}` |
 | `template-bind-to-device` | Bind a System / CLI-Group / SDWAN template to a device or model device (merge semantics, dry-run supported) |
 
 **FMG endpoint quirks documented per-tool** (each tool's docstring): System templates use `/pm/devprof/adom/{adom}` for ADD but `/pm/config/adom/{adom}/devprof/{name}` for GET/UPDATE and need a `type: "devprof"` discriminator. SDWAN Templates are WAN Profiles at `/pm/wanprof/adom/{adom}` with pre-seeded undeletable `virtual-wan-link` zone — children must be added per sub-URL, not as a whole-body set. CLI Template Groups use a flat string `member` array (no `type` field). CLI Templates need referenced `$(VARS)` to exist as metadata variables first or FMG returns -9001 at write-time. Partners porting Jinja `.j2` files should `metadata-create` all referenced vars before uploading templates.

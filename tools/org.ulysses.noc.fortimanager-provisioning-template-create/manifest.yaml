@@ -1,0 +1,86 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-provisioning-template-create/1.0.0
+name: FortiManager Provisioning Template Create
+version: 1.0.0
+description: >
+  Unified create for FortiManager 7.6 "Recommended Templates" family — the
+  /pm/template/{stype}/adom/{adom} endpoint. One tool covers IPsec Tunnel,
+  BGP, Static Route, SD-WAN Overlay, and FortiAP settings templates by
+  taking stype as a parameter. Accepts friendly names (ipsec, bgp,
+  static-route, sdwan-overlay, fap) and maps to FMG stype codes internally.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, template, provisioning, ipsec, bgp, sdwan, overlay]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, adom, name, stype]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, description: "Target ADOM"}
+    name: {type: string, description: "Template name (unique within stype+adom)"}
+    stype:
+      type: string
+      description: >
+        Template subtype. Friendly names (auto-mapped): ipsec | bgp |
+        static-route | sdwan-overlay | fap. Raw FMG codes accepted too:
+        _ipsec, router_bgp, _router_static, _sdwan_overlay, _fap_setting.
+    description: {type: string, default: "", description: "Free-text description"}
+    revision_note:
+      type: string
+      description: >
+        Optional revision note to append via /pm/config/adom/{adom}/_objrev/template/{stype}/{name}
+        after create (matches GUI "make {type} template" annotation).
+    overwrite:
+      type: boolean
+      default: false
+      description: "If true and template exists, delete-and-recreate (destructive)"
+    dry_run:
+      type: boolean
+      default: false
+      description: "Return the payload that would be POSTed without executing"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string, enum: [created, recreated, already-exists, dry-run]}
+    name: {type: string}
+    adom: {type: string}
+    stype: {type: string}
+    stype_resolved: {type: string, description: "The raw FMG stype code that was actually sent"}
+    oid: {type: integer}
+    endpoint_used: {type: string}
+    revision_added: {type: boolean}
+    payload_sent: {type: object}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000
