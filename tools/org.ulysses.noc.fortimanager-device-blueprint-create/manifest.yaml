@@ -1,0 +1,114 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-device-blueprint-create/1.0.0
+name: FortiManager Device Blueprint Create
+version: 1.0.0
+description: >
+  Create a NAMED Device Blueprint in FortiManager 7.6 via
+  /pm/config/adom/{adom}/obj/fmg/device/blueprint. Named blueprints are the
+  reusable objects referenced by CSV model-device imports (Device Blueprint
+  column) and by model-device-create as an alternative to inline blueprints.
+  Handles the numeric-prefix template refs (1__x, 4-1__x, 4-2__x, 4-1240__x,
+  5__x) with auto-prefix from stype via a template-catalog lookup.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, blueprint, device, provisioning, ztp, csv, mssp]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, adom, name, platform]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string}
+    name: {type: string, description: "Blueprint name (mkey, unique per ADOM)"}
+    platform:
+      type: string
+      description: "FortiGate platform. e.g. FortiGate-30G, FortiGate-50G, FortiGate-120G, FortiGate-VM64-KVM"
+    description: {type: string, default: "", description: "Free text"}
+    pkg: {type: string, description: "Policy package name to bind"}
+    folder: {type: string, description: "FMG folder path (default /)"}
+    templates:
+      type: array
+      items: {type: string}
+      description: >
+        Provisioning template names (System / IPsec / BGP / Static / SDWAN Overlay /
+        FortiAP). Pass friendly names — tool auto-adds the FMG numeric prefix by
+        querying the template catalog. Advanced users may pass pre-prefixed refs
+        like '4-1__my-ipsec-tpl' directly (auto-detected).
+    template_group: {type: string, description: "CLI Template Group name (mutex with templates — sets prov-type=template-group)"}
+    cliprofs:
+      type: array
+      items: {type: string}
+      description: "CLI Template names (separate list from templates; still executes at install)"
+    prerun_cliprof:
+      type: array
+      items: {type: string}
+      description: "CLI Templates run BEFORE others (green-field prep, e.g. BOR-GREENFIELD-120G-PREP)"
+    auth_template:
+      type: array
+      items: {type: string}
+      description: "Fabric authorization template names"
+    enforce_device_config: {type: boolean, default: false, description: "true = enforce config from templates (device drift reverted)"}
+    sdwan_management: {type: boolean, default: false, description: "true = FMG owns device SDWAN"}
+    vm_log_disk: {type: boolean, default: false, description: "VM only — attach log disk"}
+    port_provisioning:
+      type: integer
+      default: 1
+      description: "0/1 — enable port provisioning (from template port-map)"
+    prefer_img_ver: {type: string, description: "Preferred FortiOS version at install"}
+    dev_group:
+      type: array
+      items: {type: string}
+      description: "Device group refs to include this blueprint's devices in"
+    ha_config: {type: boolean, default: false, description: "Enable HA on the model"}
+    ha_password: {type: string, description: "HA password (if ha_config=true)"}
+    linked_to_model: {type: boolean, default: false, description: "Link to another model device (HA slave)"}
+    cluster_worker:
+      type: array
+      items: {type: string}
+      description: "HA cluster worker names"
+    overwrite: {type: boolean, default: false, description: "If true and exists, update (set) instead of add"}
+    dry_run: {type: boolean, default: false, description: "Return the payload without POSTing"}
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string, enum: [created, updated, already-exists, dry-run]}
+    name: {type: string}
+    adom: {type: string}
+    platform: {type: string}
+    prov_type: {type: string}
+    templates_resolved: {type: array, items: {type: string}, description: "The final numeric-prefixed template refs"}
+    endpoint_used: {type: string}
+    payload_sent: {type: object}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000
