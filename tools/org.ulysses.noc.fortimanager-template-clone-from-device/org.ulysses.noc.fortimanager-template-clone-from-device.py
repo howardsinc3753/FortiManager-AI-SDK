@@ -26,8 +26,17 @@ The target lands at /pm/wanprof/adom/{adom}/<target_name>.
 The wanprof named <target_name> must ALREADY EXIST (create with sdwan-template-create
 first — the import merges the device's SDWAN into it, matching FMG's GUI flow).
 
+System Templates use a THIRD mechanism — similar to SDWAN but different payload:
+Preset `system` (alias `devprof`) internally routes to:
+    method: exec
+    url:    /pm/config/adom/{adom}/_devprof/import
+    data:   {"device": "<dev_name>", "devprof": "<target_name>", "description": "..."}
+The target lands at /pm/devprof/adom/{adom}/<target_name>.
+Note: `device` is a plain string here (NOT the {name,vdom} dict SDWAN uses).
+The devprof shell must exist first (create with system-template-create).
+
 Author: Ulysses Project
-Version: 1.1.0
+Version: 1.2.0
 """
 
 import asyncio
@@ -56,7 +65,9 @@ _PRESETS: Dict[str, Dict[str, str]] = {
     "ipsec-phase1":   {"type": "clone", "source_path": "vpn/ipsec/phase1-interface",    "stype": "_ipsec"},
     "ipsec":          {"type": "clone", "source_path": "vpn/ipsec/phase1-interface",    "stype": "_ipsec"},  # alias
     "ipsec-phase2":   {"type": "clone", "source_path": "vpn/ipsec/phase2-interface",    "stype": "_ipsec"},
-    "sdwan":          {"type": "wanprof-import", "stype": "wanprof"},  # uses dedicated import endpoint
+    "sdwan":          {"type": "wanprof-import", "stype": "wanprof"},  # dedicated /_wanprof/import endpoint
+    "system":         {"type": "devprof-import", "stype": "devprof"},  # dedicated /_devprof/import endpoint
+    "devprof":        {"type": "devprof-import", "stype": "devprof"},  # alias for system
 }
 
 
@@ -112,6 +123,22 @@ def _resolve_clone(entry: Dict[str, Any], device: str, vdom: str, adom: str) -> 
             "target_url": target_url,
             "verify_url": f"/pm/wanprof/adom/{adom}/{target_name}",
         }
+    elif op_type == "devprof-import":
+        # Uses the dedicated System Template import endpoint (per GUI-observed pattern)
+        # NOTE: `device` here is a plain string (device name), NOT {name,vdom} dict
+        import_url = f"/pm/config/adom/{adom}/_devprof/import"
+        target_url = f"/pm/devprof/adom/{adom}/{target_name}"
+        spec = {
+            "method": "exec",
+            "url": import_url,
+            "data": {
+                "device": device,  # plain string per GUI curl
+                "devprof": target_name,
+                "description": entry.get("description") or f"System template imported from {device}",
+            },
+            "target_url": target_url,
+            "verify_url": f"/pm/devprof/adom/{adom}/{target_name}",
+        }
     else:
         raise ValueError(f"Unknown op_type {op_type!r}")
 
@@ -161,9 +188,14 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
             if overwrite:
                 if op_type == "clone":
                     del_url = f"/pm/template/{stype}/adom/{adom}/{target_name}"
-                else:  # wanprof-import
+                elif op_type == "wanprof-import":
                     del_url = f"/pm/wanprof/adom/{adom}/{target_name}"
-                client.call("delete", del_url)
+                elif op_type == "devprof-import":
+                    del_url = f"/pm/devprof/adom/{adom}/{target_name}"
+                else:
+                    del_url = None
+                if del_url:
+                    client.call("delete", del_url)
                 # Ignore delete errors (target may not exist) — we care about the op below
 
             # Fire the operation
@@ -230,6 +262,7 @@ if __name__ == "__main__":
             {"preset": "ipsec-phase1", "target_name": "BOR-IPSEC-P1-SINGLE"},
             {"preset": "ipsec-phase2", "target_name": "BOR-IPSEC-P2-SINGLE"},
             {"preset": "sdwan",        "target_name": "BOR-SDWAN-SINGLE"},
+            {"preset": "system",       "target_name": "BOR-SYSTEM-SINGLE"},
         ],
         "overwrite": True,
     })), indent=2))

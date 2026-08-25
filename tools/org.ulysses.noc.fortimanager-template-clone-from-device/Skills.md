@@ -35,6 +35,7 @@ CLI templates stay as the initial-provision authority (Jinja + $(VAR) power); th
 | `ipsec-phase1` (alias `ipsec`) | clone | `pm/config/device/{dev}/vdom/{vdom}/vpn/ipsec/phase1-interface` | `pm/template/_ipsec/adom/{adom}/{name}` |
 | `ipsec-phase2` | clone | `pm/config/device/{dev}/vdom/{vdom}/vpn/ipsec/phase2-interface` | `pm/template/_ipsec/adom/{adom}/{name}` |
 | `sdwan` | exec `/_wanprof/import` | device's `system/sdwan` (implicit) | `pm/wanprof/adom/{adom}/{name}` |
+| `system` (alias `devprof`) | exec `/_devprof/import` | device's system/dns/ntp/admin/snmp/log/etc. (implicit) | `pm/devprof/adom/{adom}/{name}` |
 
 ### SDWAN preset specifics
 
@@ -52,6 +53,26 @@ data: {
 The wanprof shell (`target_name`) must already exist in the ADOM — create it with `sdwan-template-create` first. The import MERGES the device's runtime SDWAN config (zones, members, health-checks, service rules, BGP neighbors) INTO the target wanprof. This matches FMG's GUI "Import SDWAN From Device" flow.
 
 Endpoint discovered via FMG GUI curl capture (thanks Daniel).
+
+### System / devprof preset specifics
+
+System templates (aka `devprof` in FMG's data model) use a THIRD mechanism — similar shape to SDWAN but different payload:
+
+```
+exec /pm/config/adom/{adom}/_devprof/import
+data: {
+  "device":      "<dev_name>",           # PLAIN STRING here (not {name,vdom} dict!)
+  "devprof":     "<target_devprof_name>",
+  "description": "..."
+}
+```
+
+Captures the device's `enabled options` subsystems in one call:
+`dns / ntp / email / admin / snmp / repmsg / ftgd / log / interface / router / combined`
+
+Verify content lands at `/pm/config/adom/{adom}/devprof/{name}/system/{section}` (device-shape path, NOT `/pm/devprof/...` — that shape only returns the top-level).
+
+Endpoint discovered via FMG GUI curl capture 2026-08-25.
 
 ## Parameters
 
@@ -77,7 +98,7 @@ Endpoint discovered via FMG GUI curl capture (thanks Daniel).
 
 ```python
 execute_certified_tool(
-    canonical_id="org.ulysses.noc.fortimanager-template-clone-from-device/1.1.0",
+    canonical_id="org.ulysses.noc.fortimanager-template-clone-from-device/1.2.0",
     parameters={
         "fmg_host": "184.73.7.106",
         "adom": "BOR_Customer_1",
@@ -89,6 +110,7 @@ execute_certified_tool(
             {"preset": "ipsec-phase1", "target_name": "BOR-IPSEC-P1-SINGLE"},
             {"preset": "ipsec-phase2", "target_name": "BOR-IPSEC-P2-SINGLE"},
             {"preset": "sdwan",        "target_name": "BOR-SDWAN-SINGLE"},
+            {"preset": "system",       "target_name": "BOR-SYSTEM-SINGLE"},
         ],
         "overwrite": True,
     }
@@ -119,8 +141,9 @@ Note: **IPsec Phase 2 clone can return non-zero `code` (e.g. -10000) but the tem
 
 | Error | Meaning | Fix |
 |---|---|---|
-| `Unknown preset 'X'` | Preset name typo | Use one of: bgp, static-route, ipsec-phase1, ipsec-phase2, sdwan |
+| `Unknown preset 'X'` | Preset name typo | Use one of: bgp, static-route, ipsec-phase1, ipsec-phase2, sdwan, system |
 | `sdwan` preset: `-6 unknown template` | Target wanprof shell doesn't exist | Create with `sdwan-template-create` first (empty shell is fine) |
+| `system` preset: `-6 unknown devprof` | Target devprof shell doesn't exist | Create with `system-template-create` first (empty shell is fine) |
 | `Either preset OR both source_path+stype must be provided` | Custom clone missing fields | Provide both source_path and stype, or use a preset |
 | `FMG HTTP 503` | Server temporarily busy | Retry after brief pause (2-3s); tool doesn't auto-retry today |
 | `code=-1 invalid value` on target | Target URL shape wrong for this stype | Verify stype matches an /pm/template/ family (not /pm/wanprof or /pm/devprof) |

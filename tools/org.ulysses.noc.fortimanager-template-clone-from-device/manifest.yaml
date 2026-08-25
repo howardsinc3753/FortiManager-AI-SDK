@@ -1,7 +1,7 @@
 ---
-canonical_id: org.ulysses.noc.fortimanager-template-clone-from-device/1.1.0
+canonical_id: org.ulysses.noc.fortimanager-template-clone-from-device/1.2.0
 name: FortiManager Template Clone From Device
-version: 1.1.0
+version: 1.2.0
 description: >
   Clone live device config from DVMDB into named FMG provisioning templates
   (IPsec/BGP/Static/etc). Closes the CLI-Template-to-Human-Template loop -
@@ -44,7 +44,7 @@ parameters:
         properties:
           preset:
             type: string
-            description: "Friendly shortcut: bgp / static-route / ipsec-phase1 / ipsec-phase2 / sdwan"
+            description: "Friendly shortcut: bgp / static-route / ipsec-phase1 / ipsec-phase2 / sdwan / system"
           source_path:
             type: string
             description: "Custom source under /pm/config/device/{dev}/vdom/{vdom}/ (e.g. router/bgp). Ignored if preset set."
