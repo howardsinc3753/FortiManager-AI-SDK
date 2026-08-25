@@ -1,0 +1,101 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-template-clone-from-device/1.0.0
+name: FortiManager Template Clone From Device
+version: 1.0.0
+description: >
+  Clone live device config from DVMDB into named FMG provisioning templates
+  (IPsec/BGP/Static/etc). Closes the CLI-Template-to-Human-Template loop -
+  initial provision via CLI templates plus Jinja $(VAR) refs, then clone the
+  resolved device config into dedicated per-family templates for long-term
+  MAC (Move/Add/Change/Delete) via FMG-native GUI wizards.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, template, clone, import, dvmdb, provisioning, mac-ops]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, adom, device, clones]
+  properties:
+    fmg_host: {type: string}
+    adom: {type: string, description: "Target ADOM where the human-facing templates will land"}
+    device: {type: string, description: "Source device name (DVMDB) - config gets read from here"}
+    vdom: {type: string, default: root, description: "Source vdom on the device"}
+    clones:
+      type: array
+      description: >
+        List of clone directives. Each entry either uses a friendly preset
+        (`preset` param) or an explicit source_path + stype + target_name.
+      items:
+        type: object
+        properties:
+          preset:
+            type: string
+            description: "Friendly shortcut: bgp / static-route / ipsec-phase1 / ipsec-phase2 / firewall-address / router-policy"
+          source_path:
+            type: string
+            description: "Custom source under /pm/config/device/{dev}/vdom/{vdom}/ (e.g. router/bgp). Ignored if preset set."
+          stype:
+            type: string
+            description: "Target /pm/template/ stype (e.g. router_bgp, _ipsec, _router_static). Auto-set by preset."
+          target_name:
+            type: string
+            description: "Name of the resulting human-facing template. Required."
+    overwrite:
+      type: boolean
+      default: false
+      description: "If target template exists, delete first then clone (destructive)"
+    stop_on_error:
+      type: boolean
+      default: false
+      description: "If true, halt after first clone failure. Otherwise continue with remaining clones."
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string, enum: [cloned, partial, failed]}
+    adom: {type: string}
+    device: {type: string}
+    results:
+      type: array
+      items:
+        type: object
+        properties:
+          preset: {type: string}
+          source_url: {type: string}
+          target_url: {type: string}
+          status: {type: string}
+          code: {type: integer}
+          oid: {type: integer}
+          message: {type: string}
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 60000
