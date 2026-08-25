@@ -170,17 +170,18 @@ if __name__ == "__main__":
     import json
     host = sys.argv[1] if len(sys.argv) > 1 else "fmg.example.com"
     dev = sys.argv[2] if len(sys.argv) > 2 else "spoke-1"
-    # Smoke: clone BGP + Static + IPsec (P1+P2) from spoke-1 into BOR_Customer_1 human templates
+    # Smoke: clone BGP + Static + IPsec (P1+P2) from spoke-1 into ADOM dedicated templates
+    # Naming convention BOR-<family>-SINGLE (leaves room for -DUAL variants for dual-circuit)
     print(json.dumps(asyncio.run(execute({
         "fmg_host": host,
         "adom": "BOR_Customer_1",
         "device": dev,
         "vdom": "root",
         "clones": [
-            {"preset": "bgp",          "target_name": f"HUMAN-{dev}-BGP"},
-            {"preset": "static-route", "target_name": f"HUMAN-{dev}-STATIC"},
-            {"preset": "ipsec-phase1", "target_name": f"HUMAN-{dev}-IPSEC-P1"},
-            {"preset": "ipsec-phase2", "target_name": f"HUMAN-{dev}-IPSEC-P2"},
+            {"preset": "bgp",          "target_name": "BOR-BGP-SINGLE"},
+            {"preset": "static-route", "target_name": "BOR-STATIC-SINGLE"},
+            {"preset": "ipsec-phase1", "target_name": "BOR-IPSEC-P1-SINGLE"},
+            {"preset": "ipsec-phase2", "target_name": "BOR-IPSEC-P2-SINGLE"},
         ],
         "overwrite": True,
     })), indent=2))

@@ -9,7 +9,7 @@ Use this tool when:
 
 **Example prompts:**
 - "Clone spoke-1's BGP + Static + IPsec into human-facing templates for BOR_Customer_1"
-- "Take the golden config from spoke-1 and drop it into IPsec/BGP/Static templates named HUMAN-*"
+- "Take the golden config from spoke-1 and drop it into IPsec/BGP/Static templates named BOR-*-SINGLE"
 - "Dry-run: what URLs would the clone hit?"
 
 ## The workflow this completes
@@ -70,10 +70,10 @@ execute_certified_tool(
         "device": "spoke-1",
         "vdom": "root",
         "clones": [
-            {"preset": "bgp",          "target_name": "HUMAN-BOR-BGP"},
-            {"preset": "static-route", "target_name": "HUMAN-BOR-STATIC"},
-            {"preset": "ipsec-phase1", "target_name": "HUMAN-BOR-IPSEC-P1"},
-            {"preset": "ipsec-phase2", "target_name": "HUMAN-BOR-IPSEC-P2"},
+            {"preset": "bgp",          "target_name": "BOR-BGP-SINGLE"},
+            {"preset": "static-route", "target_name": "BOR-STATIC-SINGLE"},
+            {"preset": "ipsec-phase1", "target_name": "BOR-IPSEC-P1-SINGLE"},
+            {"preset": "ipsec-phase2", "target_name": "BOR-IPSEC-P2-SINGLE"},
         ],
         "overwrite": True,
     }
@@ -90,7 +90,7 @@ execute_certified_tool(
   "adom": "BOR_Customer_1",
   "device": "spoke-1",
   "results": [
-    {"preset": "bgp",          "status": "cloned", "code": 0, "oid": 6793, "source_url": "pm/config/device/spoke-1/vdom/root/router/bgp", "target_url": "pm/config/adom/BOR_Customer_1/template/router_bgp/HUMAN-BOR-BGP"},
+    {"preset": "bgp",          "status": "cloned", "code": 0, "oid": 6793, "source_url": "pm/config/device/spoke-1/vdom/root/router/bgp", "target_url": "pm/config/adom/BOR_Customer_1/template/router_bgp/BOR-BGP-SINGLE"},
     {"preset": "static-route", "status": "cloned", "code": 0, "oid": 6810, ...},
     {"preset": "ipsec-phase1", "status": "cloned", "code": 0, "oid": 6824, ...},
     {"preset": "ipsec-phase2", "status": "cloned", "code": -10000, "oid": 6834, "message": "invalid value"}
