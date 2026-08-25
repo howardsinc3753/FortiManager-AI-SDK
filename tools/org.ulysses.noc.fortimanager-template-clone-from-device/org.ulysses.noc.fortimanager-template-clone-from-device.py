@@ -16,14 +16,18 @@ Confirmed working on FMG 7.6.7 for these stypes:
   - _router_static    (source: router/static)
   - _ipsec            (source: vpn/ipsec/phase1-interface OR phase2-interface)
 
-Known gap on 7.6.7:
-  - SDWAN (source: system/sdwan) requires shell-first wanprof creation before
-    clone will land — target /pm/wanprof/adom/{adom} rejected with -1/-503.
-    Not yet wrapped in a preset — use `source_path` + custom `stype` if you
-    figure out the right target format.
+SDWAN uses a DIFFERENT mechanism (dedicated import endpoint, not clone method).
+Preset `sdwan` internally routes to:
+    method: exec
+    url:    /pm/config/adom/{adom}/_wanprof/import
+    data:   {"template": "<target_name>", "device": {"name": dev, "vdom": vdom},
+             "description": "..."}
+The target lands at /pm/wanprof/adom/{adom}/<target_name>.
+The wanprof named <target_name> must ALREADY EXIST (create with sdwan-template-create
+first — the import merges the device's SDWAN into it, matching FMG's GUI flow).
 
 Author: Ulysses Project
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import asyncio
@@ -40,21 +44,30 @@ from fortimanager_client import FortiManagerClient  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# Friendly-name presets: preset -> (source_path, stype)
-# source_path is appended to /pm/config/device/{dev}/vdom/{vdom}/
-# stype selects /pm/template/{stype}/adom/{adom}/{name} as the target
+# Friendly-name presets:
+#   Type "clone" -> uses method=clone on /pm/config/device/{dev}/vdom/{vdom}/{source_path}
+#                   target is /pm/template/{stype}/adom/{adom}/{name}
+#   Type "wanprof-import" -> uses method=exec on /pm/config/adom/{adom}/_wanprof/import
+#                            target is a wanprof named {target_name}
 _PRESETS: Dict[str, Dict[str, str]] = {
-    "bgp":            {"source_path": "router/bgp",                    "stype": "router_bgp"},
-    "static-route":   {"source_path": "router/static",                 "stype": "_router_static"},
-    "static":         {"source_path": "router/static",                 "stype": "_router_static"},
-    "ipsec-phase1":   {"source_path": "vpn/ipsec/phase1-interface",    "stype": "_ipsec"},
-    "ipsec":          {"source_path": "vpn/ipsec/phase1-interface",    "stype": "_ipsec"},  # alias
-    "ipsec-phase2":   {"source_path": "vpn/ipsec/phase2-interface",    "stype": "_ipsec"},
+    "bgp":            {"type": "clone", "source_path": "router/bgp",                    "stype": "router_bgp"},
+    "static-route":   {"type": "clone", "source_path": "router/static",                 "stype": "_router_static"},
+    "static":         {"type": "clone", "source_path": "router/static",                 "stype": "_router_static"},  # alias
+    "ipsec-phase1":   {"type": "clone", "source_path": "vpn/ipsec/phase1-interface",    "stype": "_ipsec"},
+    "ipsec":          {"type": "clone", "source_path": "vpn/ipsec/phase1-interface",    "stype": "_ipsec"},  # alias
+    "ipsec-phase2":   {"type": "clone", "source_path": "vpn/ipsec/phase2-interface",    "stype": "_ipsec"},
+    "sdwan":          {"type": "wanprof-import", "stype": "wanprof"},  # uses dedicated import endpoint
 }
 
 
-def _resolve_clone(entry: Dict[str, Any], device: str, vdom: str, adom: str) -> tuple[str, str, str, str]:
-    """Resolve a clone entry into (source_url, target_url, effective_preset, effective_stype)."""
+def _resolve_clone(entry: Dict[str, Any], device: str, vdom: str, adom: str) -> tuple[str, Dict[str, Any], str, str]:
+    """Resolve a clone entry into (op_type, request_spec, effective_preset, effective_stype).
+
+    op_type is "clone" or "wanprof-import".
+    request_spec is a dict describing the API call to make:
+      - clone: {"method": "clone", "url": source, "data": {"new url": target}, "target_url": target}
+      - wanprof-import: {"method": "exec", "url": import_url, "data": {...}, "target_url": verify_url}
+    """
     preset = entry.get("preset")
     target_name = entry.get("target_name")
     if not target_name:
@@ -63,17 +76,46 @@ def _resolve_clone(entry: Dict[str, Any], device: str, vdom: str, adom: str) -> 
     if preset:
         if preset not in _PRESETS:
             raise ValueError(f"Unknown preset {preset!r}. Known: {sorted(_PRESETS.keys())}")
-        source_path = _PRESETS[preset]["source_path"]
-        stype = _PRESETS[preset]["stype"]
+        preset_def = _PRESETS[preset]
+        op_type = preset_def["type"]
+        stype = preset_def["stype"]
+        source_path = preset_def.get("source_path")
     else:
         source_path = entry.get("source_path")
         stype = entry.get("stype")
-        if not (source_path and stype):
-            raise ValueError("Either preset OR both source_path+stype must be provided")
+        op_type = entry.get("op_type", "clone")
+        if not (source_path and stype) and op_type == "clone":
+            raise ValueError("Either preset OR both source_path+stype must be provided for clone type")
 
-    source_url = f"pm/config/device/{device}/vdom/{vdom}/{source_path.lstrip('/')}"
-    target_url = f"pm/config/adom/{adom}/template/{stype}/{target_name}"
-    return source_url, target_url, preset or "custom", stype
+    if op_type == "clone":
+        source_url = f"pm/config/device/{device}/vdom/{vdom}/{source_path.lstrip('/')}"
+        target_url = f"pm/config/adom/{adom}/template/{stype}/{target_name}"
+        spec = {
+            "method": "clone",
+            "url": source_url,
+            "data": {"new url": target_url},
+            "target_url": target_url,
+            "verify_url": f"/pm/template/{stype}/adom/{adom}/{target_name}",
+        }
+    elif op_type == "wanprof-import":
+        # Uses the dedicated SDWAN import endpoint (per GUI-observed pattern)
+        import_url = f"/pm/config/adom/{adom}/_wanprof/import"
+        target_url = f"/pm/wanprof/adom/{adom}/{target_name}"
+        spec = {
+            "method": "exec",
+            "url": import_url,
+            "data": {
+                "template": target_name,
+                "device": {"name": device, "vdom": vdom},
+                "description": entry.get("description") or f"SDWAN imported from {device}",
+            },
+            "target_url": target_url,
+            "verify_url": f"/pm/wanprof/adom/{adom}/{target_name}",
+        }
+    else:
+        raise ValueError(f"Unknown op_type {op_type!r}")
+
+    return op_type, spec, preset or "custom", stype
 
 
 async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -106,29 +148,34 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
     for idx, entry in enumerate(clones):
         result: Dict[str, Any] = {"preset": entry.get("preset") or "custom"}
         try:
-            source_url, target_url, effective_preset, stype = _resolve_clone(entry, device, vdom, adom)
-            result["source_url"] = source_url
-            result["target_url"] = target_url
+            op_type, spec, effective_preset, stype = _resolve_clone(entry, device, vdom, adom)
+            result["op_type"] = op_type
+            result["source_url"] = spec.get("url")
+            result["target_url"] = spec["target_url"]
             result["preset"] = effective_preset
             result["stype"] = stype
 
+            target_name = entry["target_name"]
+
             # Overwrite handling: delete existing target first
             if overwrite:
-                target_name = entry["target_name"]
-                del_r = client.call("delete", f"/pm/template/{stype}/adom/{adom}/{target_name}")
-                # Ignore delete errors (target may not exist) — we care about the clone below
+                if op_type == "clone":
+                    del_url = f"/pm/template/{stype}/adom/{adom}/{target_name}"
+                else:  # wanprof-import
+                    del_url = f"/pm/wanprof/adom/{adom}/{target_name}"
+                client.call("delete", del_url)
+                # Ignore delete errors (target may not exist) — we care about the op below
 
-            # Fire the clone
-            r = client.call("clone", source_url, data={"new url": target_url})
+            # Fire the operation
+            r = client.call(spec["method"], spec["url"], data=spec["data"])
             status = r.get("result", [{}])[0].get("status") or {}
             code = status.get("code")
             msg = status.get("message") or ""
 
-            # FMG sometimes returns non-zero codes but the clone still landed
-            # (observed: IPsec phase2 returns -10000 "invalid value" but object appears).
+            # FMG sometimes returns non-zero codes but the object still lands
+            # (observed: IPsec phase2 returns -10000 "invalid value" but appears).
             # Verify by GET on the target.
-            verify_url = f"/pm/template/{stype}/adom/{adom}/{entry['target_name']}"
-            verify_r = client.get(verify_url, fields=["name", "oid"])
+            verify_r = client.get(spec["verify_url"], fields=["name", "oid"])
             verify_data = verify_r.get("result", [{}])[0].get("data") or {}
             landed = bool(verify_data.get("oid"))
 
@@ -182,6 +229,7 @@ if __name__ == "__main__":
             {"preset": "static-route", "target_name": "BOR-STATIC-SINGLE"},
             {"preset": "ipsec-phase1", "target_name": "BOR-IPSEC-P1-SINGLE"},
             {"preset": "ipsec-phase2", "target_name": "BOR-IPSEC-P2-SINGLE"},
+            {"preset": "sdwan",        "target_name": "BOR-SDWAN-SINGLE"},
         ],
         "overwrite": True,
     })), indent=2))

@@ -28,16 +28,30 @@ CLI templates stay as the initial-provision authority (Jinja + $(VAR) power); th
 
 ## Confirmed presets (FMG 7.6.7)
 
-| Preset | Source path (under `/pm/config/device/{dev}/vdom/{vdom}/`) | Target template stype |
-|---|---|---|
-| `bgp` | `router/bgp` | `router_bgp` |
-| `static-route` (alias `static`) | `router/static` | `_router_static` |
-| `ipsec-phase1` (alias `ipsec`) | `vpn/ipsec/phase1-interface` | `_ipsec` |
-| `ipsec-phase2` | `vpn/ipsec/phase2-interface` | `_ipsec` |
+| Preset | Mechanism | Source | Target |
+|---|---|---|---|
+| `bgp` | clone | `pm/config/device/{dev}/vdom/{vdom}/router/bgp` | `pm/template/router_bgp/adom/{adom}/{name}` |
+| `static-route` (alias `static`) | clone | `pm/config/device/{dev}/vdom/{vdom}/router/static` | `pm/template/_router_static/adom/{adom}/{name}` |
+| `ipsec-phase1` (alias `ipsec`) | clone | `pm/config/device/{dev}/vdom/{vdom}/vpn/ipsec/phase1-interface` | `pm/template/_ipsec/adom/{adom}/{name}` |
+| `ipsec-phase2` | clone | `pm/config/device/{dev}/vdom/{vdom}/vpn/ipsec/phase2-interface` | `pm/template/_ipsec/adom/{adom}/{name}` |
+| `sdwan` | exec `/_wanprof/import` | device's `system/sdwan` (implicit) | `pm/wanprof/adom/{adom}/{name}` |
 
-## Known gap
+### SDWAN preset specifics
 
-**SDWAN** (source `system/sdwan`) needs shell-first wanprof creation before the clone will land — bare `/pm/wanprof/adom/{adom}` target returns HTTP 503, and `/pm/config/adom/{adom}/wanprof/{name}` returns `-1 invalid value`. Not yet wrapped as a preset. Manual GUI clone works; API pattern TBD (probably: create empty wanprof shell → clone `system/sdwan` INTO the shell's sub-URL).
+SDWAN does NOT use the JSON-RPC `clone` method — it uses a dedicated import endpoint:
+
+```
+exec /pm/config/adom/{adom}/_wanprof/import
+data: {
+  "template": "<target_wanprof_name>",   # MUST already exist
+  "device":   {"name": "<dev>", "vdom": "<vdom>"},
+  "description": "..."
+}
+```
+
+The wanprof shell (`target_name`) must already exist in the ADOM — create it with `sdwan-template-create` first. The import MERGES the device's runtime SDWAN config (zones, members, health-checks, service rules, BGP neighbors) INTO the target wanprof. This matches FMG's GUI "Import SDWAN From Device" flow.
+
+Endpoint discovered via FMG GUI curl capture (thanks Daniel).
 
 ## Parameters
 
@@ -63,7 +77,7 @@ CLI templates stay as the initial-provision authority (Jinja + $(VAR) power); th
 
 ```python
 execute_certified_tool(
-    canonical_id="org.ulysses.noc.fortimanager-template-clone-from-device/1.0.0",
+    canonical_id="org.ulysses.noc.fortimanager-template-clone-from-device/1.1.0",
     parameters={
         "fmg_host": "184.73.7.106",
         "adom": "BOR_Customer_1",
@@ -74,6 +88,7 @@ execute_certified_tool(
             {"preset": "static-route", "target_name": "BOR-STATIC-SINGLE"},
             {"preset": "ipsec-phase1", "target_name": "BOR-IPSEC-P1-SINGLE"},
             {"preset": "ipsec-phase2", "target_name": "BOR-IPSEC-P2-SINGLE"},
+            {"preset": "sdwan",        "target_name": "BOR-SDWAN-SINGLE"},
         ],
         "overwrite": True,
     }
@@ -104,7 +119,8 @@ Note: **IPsec Phase 2 clone can return non-zero `code` (e.g. -10000) but the tem
 
 | Error | Meaning | Fix |
 |---|---|---|
-| `Unknown preset 'X'` | Preset name typo | Use one of: bgp, static-route, ipsec-phase1, ipsec-phase2 |
+| `Unknown preset 'X'` | Preset name typo | Use one of: bgp, static-route, ipsec-phase1, ipsec-phase2, sdwan |
+| `sdwan` preset: `-6 unknown template` | Target wanprof shell doesn't exist | Create with `sdwan-template-create` first (empty shell is fine) |
 | `Either preset OR both source_path+stype must be provided` | Custom clone missing fields | Provide both source_path and stype, or use a preset |
 | `FMG HTTP 503` | Server temporarily busy | Retry after brief pause (2-3s); tool doesn't auto-retry today |
 | `code=-1 invalid value` on target | Target URL shape wrong for this stype | Verify stype matches an /pm/template/ family (not /pm/wanprof or /pm/devprof) |
