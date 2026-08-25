@@ -1,0 +1,133 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-device-group-create/1.0.0
+name: FortiManager Device Group Create
+version: 1.0.0
+description: >
+  Create or update a FortiManager DVMDB Device Group in an ADOM, optionally
+  seeding members. Groups are the tenant-scale organizational unit — put all
+  BOR-Single sites in one group, BOR-Dual in another; bulk install, bulk meta
+  var push, and CLI-template-group `scope member` bindings can all target the
+  group instead of each device individually. Idempotent via overwrite=true.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, dvmdb, group, device-group, provisioning, mssp]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, name]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      default: root
+      description: Target ADOM (tenant scope)
+    name:
+      type: string
+      description: Device group name (unique within ADOM)
+    desc:
+      type: string
+      default: ""
+      description: Free-text description shown in FMG GUI (alias `description`)
+    type:
+      type: string
+      default: normal
+      enum: [normal, default]
+      description: Group type. `normal` is the standard tenant group.
+    os_type:
+      type: string
+      default: fos
+      enum: [fos, fsw, fpx, foc, faz, fml, fdd, fac, fca]
+      description: >
+        Device OS family the group holds. `fos` = FortiGate; `fsw` = FortiSwitch;
+        `foc` = FortiOS-CarrierV; `faz` = FortiAnalyzer; etc.
+    meta_fields:
+      type: object
+      default: {}
+      description: >
+        Meta variables scoped at group level (rare — usually meta vars live at
+        ADOM or device level). Alias `meta fields` (space form) also accepted.
+    members:
+      type: array
+      description: >
+        Optional list of devices to seed as group members. Each entry can be a
+        plain device-name string (vdom defaults to `root`) or a {name, vdom}
+        object. If provided (even empty list), REPLACES existing membership.
+        If omitted entirely, group membership is left untouched.
+      items:
+        oneOf:
+          - type: string
+          - type: object
+            properties:
+              name: {type: string}
+              vdom: {type: string, default: root}
+            required: [name]
+    overwrite:
+      type: boolean
+      default: false
+      description: >
+        If true and group exists, update it (desc/type/os_type + members
+        replace) instead of failing.
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action: {type: string, description: "created | updated | noop"}
+    members_action: {type: string, description: "set | replaced | null (untouched)"}
+    name: {type: string}
+    adom: {type: string}
+    oid: {type: integer}
+    os_type: {type: integer, description: "Returned as FMG's internal int enum (fos=0, fsw=1, ...)"}
+    type: {type: integer, description: "Returned as FMG's internal int enum (normal=0, default=1)"}
+    member_count: {type: integer, description: "What was submitted (write returned code=0). API can't read back — see verify_hint."}
+    members_submitted:
+      type: array
+      description: The member list we sent — API can't verify against readback.
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          vdom: {type: string}
+    members_verified:
+      type: [array, "null"]
+      description: Always null on FMG 7.6.7 — no JSON-RPC readback path for group members.
+    missing_devices:
+      type: array
+      items: {type: string}
+      description: Member devices not found in DVMDB (warning only — FMG allows forward refs).
+    verify_hint:
+      type: string
+      description: Where to eye-check the write in the FMG GUI.
+    error: {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 20000
