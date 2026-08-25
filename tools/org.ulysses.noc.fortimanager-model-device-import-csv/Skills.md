@@ -72,6 +72,8 @@ FGT50GTK99000002,BOR-SINGLE-STD-50G,spoke-02,2,dhcp,,,,10.2.0.1,255.255.255.0,10
 | `max_wait_sec` | int | No | `120` | |
 | `dry_run` | bool | No | `false` | Return payload without POSTing |
 | `auto_bind` | object | No | *(disabled)* | **v1.1.0** — opt-in post-import bindings. See below. |
+| `set_hostname_from_name` | bool | No | `true` | **v1.2.0** — post-import update of each device's `hostname` field to match `name` (FMG's `add-dev-list` defaults `hostname=sn` until first install). |
+| `pre_create_zone_shells` | bool | No | `true` | **v1.2.0** — before adding normalized-interface `dynamic_mapping`, create empty `system/zone/{zone}` shell on the device DB so FMG's `-10131 datasrc invalid` validation passes. CLI templates populate the zone at install time. |
 
 ### v1.1.0 `auto_bind` — post-import wiring
 
@@ -89,7 +91,29 @@ After the import succeeds (`action: imported`, at least one device created), the
 
 **Blueprint auto-magic caveat:** FMG blueprints with `port-provisioning: 1` ALREADY auto-bind new devices to their `cliprofs` + `pkg` scope members at device-creation time. The tool's template_group + policy_package bind is idempotent and will report `"nothing to add"` in that case — safe, not an error.
 
-**Deferred-not-failed for normalized interfaces:** Fresh model devices have no device-side zones yet (they're created by CLI templates at first install). FMG returns `-10131 datasrc invalid` — the tool marks these as `status: deferred` with a hint to re-run after install. Everything else in the response stays green.
+**Deferred-not-failed for normalized interfaces:** Fresh model devices have no device-side zones yet (they're created by CLI templates at first install). FMG returns `-10131 datasrc invalid`. **v1.2.0 fixes this** by pre-creating empty zone shells device-side via `set /pm/config/device/{dev}/vdom/{vdom}/system/zone/{zone}` — the shell satisfies validation, CLI template populates real interface members at install time. If the pre-create is disabled (`pre_create_zone_shells: false`) or fails, the tool falls back to marking those as `status: deferred` with a hint.
+
+### 🚨 Install-blocker context (v1.2.0)
+
+**First spoke-2 install failed with:**
+```
+Copy device global objects
+validation error on firewall policy 1..3 in policy package "BOR-SINGLE-STD-PKG", by dynamic interface check
+validation error on firewall shaping-policy 1 in policy package "BOR-SINGLE-STD-PKG", by dynamic interface check
+Vdom copy failed:
+error 42 - entry not exist. detail: Dynamic interface "Underlay_ZONE" mapping undefined for device spoke-2
+```
+
+Root cause: dynamic_mapping was `deferred` (v1.1.0 behavior) → install-time validation had no per-device mapping → the entire Policy Package copy phase aborted. Even though CLI templates would eventually create the zones at install, the pkg validation runs *first* and blocks before any template gets a chance to run.
+
+**v1.2.0 flow (default ON):**
+1. Import via CSV → device lands in DVMDB (`hostname=sn` temporarily)
+2. `set_hostname_from_name` → update `hostname` to match `name` (fixes FMG display / policy header)
+3. `pre_create_zone_shells` (per zone, per device) → `set /pm/config/device/{dev}/vdom/root/system/zone/{ZONE}` with `{name: ZONE}` (empty shell, idempotent)
+4. `add /pm/config/adom/{adom}/obj/dynamic/interface/{ZONE}/dynamic_mapping` → now validates OK (code=0)
+5. Install runs → BOR-04-ZONE-LAN CLI template populates the zone with real interface members
+
+All 4 steps happen in ONE tool call. Install is unblocked.
 
 ## Interpreting Results
 
@@ -153,7 +177,8 @@ execute_certified_tool(
 Live-tested 2026-08-25 on `BOR_Customer_1` importing spoke-2 (SN FGVMMLTM26012046). Result:
 - `template_group` + `policy_package`: FMG auto-added at import time (blueprint's `port-provisioning: 1`); tool dedupe reported `"nothing to add"`.
 - `device_group`: code=0 (verify in GUI).
-- `normalized_interfaces`: all 3 returned `status: deferred, code: -10131` — zones don't exist pre-install.
+- `normalized_interfaces` (v1.1.0): all 3 returned `status: deferred, code: -10131` — install then failed with "Dynamic interface 'Underlay_ZONE' mapping undefined for device spoke-2".
+- **v1.2.0 fix:** manual `set /pm/config/device/spoke-2/vdom/root/system/zone/{LAN_ZONE,SDWAN_ZONE,Underlay_ZONE}` shells + re-add dynamic_mapping → all 3 code=0. Now baked in as `pre_create_zone_shells=true` default. Also `set_hostname_from_name=true` default fixes hostname=SN display quirk.
 
 ## Error Handling
 

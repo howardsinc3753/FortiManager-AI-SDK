@@ -1,7 +1,7 @@
 ---
-canonical_id: org.ulysses.noc.fortimanager-model-device-import-csv/1.1.0
+canonical_id: org.ulysses.noc.fortimanager-model-device-import-csv/1.2.0
 name: FortiManager Model Device Import CSV
-version: 1.1.0
+version: 1.2.0
 description: >
   Bulk-create model devices from a CSV file, mirroring the FMG GUI's
   "Add Model Devices from CSV" flow. Reads the CSV locally, parses per FMG
@@ -66,6 +66,22 @@ parameters:
       type: boolean
       default: false
       description: "Parse the CSV and build the payload without POSTing"
+    set_hostname_from_name:
+      type: boolean
+      default: true
+      description: >
+        v1.2.0: After per-row DVM verify, update each device's `hostname`
+        field to its `name` (FMG's add-dev-list defaults hostname=sn until
+        first install refresh — this makes GUI + policy headers show the
+        friendly name immediately).
+    pre_create_zone_shells:
+      type: boolean
+      default: true
+      description: >
+        v1.2.0: When adding normalized-interface dynamic_mapping, first
+        `set /pm/config/device/{dev}/vdom/{vdom}/system/zone/{zone}` to
+        create an empty zone shell device-side so FMG's -10131 datasrc
+        validation passes. CLI templates populate the zone at install time.
     auto_bind:
       type: object
       description: >

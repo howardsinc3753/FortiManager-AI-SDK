@@ -49,8 +49,30 @@ v1.1.0 auto-bind (opt-in via `auto_bind`):
   on `scope member` REPLACES the whole list, so we merge with existing before
   writing back. Duplicate {name, vdom} pairs are skipped.
 
+v1.2.0 install-readiness fixes:
+  Two install-blocking issues found on the first spoke-2 dry run — both
+  fixed here so future imports come out install-ready:
+
+  A. Hostname stays as SN. FMG's `add-dev-list` sets `hostname = sn` by
+     default (only refreshed at first install-time from the device's
+     `config system global`). Fix: right after the per-row DVM verify, we
+     `update /dvmdb/adom/{adom}/device/{name}` with `{name, hostname: name}`
+     so the FMG display + policy header show the friendly hostname.
+     Toggleable via `set_hostname_from_name` (default true).
+
+  B. Normalized-interface dynamic_mapping returned -10131 `datasrc invalid.
+     object: system zone`. Root cause: FMG validates the `local-intf` value
+     against the device-DB `system zone` table. Fresh model devices have no
+     zones yet (they'd be created by BOR-04-ZONE-LAN CLI template at
+     install), so validation fails BEFORE install runs and blocks the whole
+     Policy Package copy. Fix: BEFORE adding the dynamic_mapping, `set
+     /pm/config/device/{dev}/vdom/{vdom}/system/zone/{zone}` to create an
+     empty zone shell on the device DB. Now dynamic_mapping validates,
+     install starts, CLI template later populates the zone with real
+     interface members. Idempotent.
+
 Author: Ulysses Project
-Version: 1.1.0
+Version: 1.2.0
 """
 
 import asyncio
@@ -167,6 +189,28 @@ def _append_scope_member(
                 "before": None, "added": 0, "after": None}
 
 
+def _ensure_device_zone_shell(
+    client: FortiManagerClient,
+    dev_name: str,
+    vdom: str,
+    zone_name: str,
+) -> Dict[str, Any]:
+    """Create an EMPTY system zone shell on the device DB.
+
+    v1.2.0 chicken-and-egg fix: FMG validates dynamic_mapping.local-intf
+    against the device-side `system zone` table. Fresh model devices have
+    no zones. Creating an empty shell (interface=[]) here lets the
+    validation pass. CLI templates fill in the real interface members at
+    install time. Idempotent (set = create-or-update)."""
+    url = f"/pm/config/device/{dev_name}/vdom/{vdom}/system/zone/{zone_name}"
+    try:
+        r = client.call("set", url, data={"name": zone_name})
+        st = _status(r)
+        return {"code": st.get("code"), "msg": (st.get("message") or "")[:80]}
+    except Exception as e:
+        return {"code": -1, "msg": f"{type(e).__name__}: {e}"}
+
+
 def _add_dynamic_mapping(
     client: FortiManagerClient,
     adom: str,
@@ -174,16 +218,26 @@ def _add_dynamic_mapping(
     dev_name: str,
     vdom: str,
     local_intf: str,
+    pre_create_zone_shell: bool = True,
 ) -> Dict[str, Any]:
     """POST a new dynamic_mapping entry to a normalized interface for one device.
 
-    NOTE: FMG validates `local-intf` against the device-side system zones/
-    interfaces table. For a fresh model device (no install yet) this returns
-    -10131 `datasrc invalid. object: system zone`. Zones only exist after the
-    device's CLI templates (e.g. `config system zone`) have run. This tool
-    marks such results as `status: deferred` — user should re-run this bind
-    AFTER the first install of the device.
+    v1.2.0: If `pre_create_zone_shell=True` (default), we `set` an empty
+    system zone with the local_intf's name on the device DB FIRST so that
+    FMG's -10131 `datasrc invalid. object: system zone` validation passes.
+    CLI template `BOR-04-ZONE-LAN` populates the zone's interface members
+    at install time.
+
+    If `pre_create_zone_shell=False` (legacy), skip the shell step; the
+    add will succeed only if the zone already exists device-side (e.g. the
+    device has been installed at least once).
     """
+    shell_result = None
+    if pre_create_zone_shell:
+        shell_result = _ensure_device_zone_shell(client, dev_name, vdom, local_intf)
+        # If shell create failed, still try the mapping — maybe zone existed
+        # already from a prior install and we just don't have write access.
+
     url = f"/pm/config/adom/{adom}/obj/dynamic/interface/{intf}/dynamic_mapping"
     data = {"_scope": [{"name": dev_name, "vdom": vdom}], "local-intf": [local_intf]}
     try:
@@ -191,22 +245,50 @@ def _add_dynamic_mapping(
         st = _status(r)
         code = st.get("code")
         msg = (st.get("message") or "")[:160]
-        # -10131 = device-side zone/intf doesn't exist yet (pre-install chicken-and-egg).
-        # Treat as deferred, not failed.
-        if code == -10131:
-            return {
-                "device": dev_name, "vdom": vdom, "code": code,
-                "msg": msg, "status": "deferred",
-                "hint": "Re-run this bind after the device's first install "
-                        "creates the zone via `config system zone`.",
-            }
-        return {
+        result: Dict[str, Any] = {
             "device": dev_name, "vdom": vdom, "code": code, "msg": msg,
-            "status": "ok" if code == 0 else "failed",
         }
+        if pre_create_zone_shell and shell_result is not None:
+            result["zone_shell"] = shell_result
+        # -10131 should be rare now (we pre-created the zone). If it still
+        # hits, mark deferred and hint the user to check zone-shell result.
+        if code == -10131:
+            result["status"] = "deferred"
+            result["hint"] = (
+                "Zone shell create may have failed OR device-side validation "
+                "still blocks. Check `zone_shell` result and manually create "
+                f"the zone via `set /pm/config/device/{dev_name}/vdom/{vdom}"
+                f"/system/zone/{local_intf}`."
+            )
+        else:
+            result["status"] = "ok" if code == 0 else "failed"
+        return result
     except Exception as e:
         return {"device": dev_name, "vdom": vdom, "code": -1,
-                "msg": f"{type(e).__name__}: {e}", "status": "failed"}
+                "msg": f"{type(e).__name__}: {e}", "status": "failed",
+                **({"zone_shell": shell_result} if shell_result else {})}
+
+
+def _set_device_hostname(
+    client: FortiManagerClient,
+    adom: str,
+    dev_name: str,
+    hostname: str,
+) -> Dict[str, Any]:
+    """v1.2.0: update `/dvmdb/adom/{adom}/device/{name}` with {name, hostname}.
+    FMG's add-dev-list defaults hostname=sn until the first install
+    refreshes from device's real `config system global`. This makes the
+    FMG display + policy headers show the friendly name immediately."""
+    try:
+        r = client.call(
+            "update",
+            f"/dvmdb/adom/{adom}/device/{dev_name}",
+            data={"name": dev_name, "hostname": hostname},
+        )
+        st = _status(r)
+        return {"code": st.get("code"), "msg": (st.get("message") or "")[:80]}
+    except Exception as e:
+        return {"code": -1, "msg": f"{type(e).__name__}: {e}"}
 
 
 def _resolve_bindings_from_blueprint(
@@ -233,6 +315,7 @@ def _do_auto_bind(
     adom: str,
     created: List[Dict[str, Any]],
     auto_bind: Dict[str, Any],
+    pre_create_zone_shells: bool = True,
 ) -> Dict[str, Any]:
     """Run the opt-in post-import bindings. `created` is the successful import list."""
     out: Dict[str, Any] = {}
@@ -337,6 +420,7 @@ def _do_auto_bind(
             for entry in new_entries:
                 per_dev.append(_add_dynamic_mapping(
                     client, adom, intf_name, entry["name"], entry["vdom"], local_intf,
+                    pre_create_zone_shell=pre_create_zone_shells,
                 ))
             ni_out.append({
                 "interface": intf_name,
@@ -402,6 +486,9 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
     dry_run = bool(params.get("dry_run", False))
     # v1.1.0: auto-bind (opt-in). None = disabled entirely.
     auto_bind: Dict[str, Any] = params.get("auto_bind") or {}
+    # v1.2.0: install-readiness fixes (both on by default)
+    set_hostname_from_name = bool(params.get("set_hostname_from_name", True))
+    pre_create_zone_shells = bool(params.get("pre_create_zone_shells", True))
 
     # Client + blueprint platform cache
     client = None if dry_run else FortiManagerClient(host=fmg_host)
@@ -524,6 +611,12 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
                 "oid": probe_data.get("oid"),
                 "in_dvm": probe_status.get("code") == 0,
             }
+            # v1.2.0: set hostname to name so FMG display + policy header don't
+            # show the raw SN until the first install refreshes it.
+            if record["in_dvm"] and set_hostname_from_name:
+                record["hostname_fix"] = _set_device_hostname(
+                    client, adom, entry["name"], entry["name"],
+                )
             if record["in_dvm"]:
                 created.append(record)
             else:
@@ -537,7 +630,12 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
         # re-run after fixing the import errors).
         bind_out: Dict[str, Any] = {}
         if auto_bind and created and action != "failed":
-            bind_out = _do_auto_bind(client, adom, created, auto_bind)
+            # v1.2.0: pass pre_create_zone_shells through to _do_auto_bind so
+            # normalized-interface binds create zone shells device-side first.
+            bind_out = _do_auto_bind(
+                client, adom, created, auto_bind,
+                pre_create_zone_shells=pre_create_zone_shells,
+            )
 
         return {
             "success": overall_ok,
