@@ -91,7 +91,13 @@ After the import succeeds (`action: imported`, at least one device created), the
 
 **Blueprint auto-magic caveat:** FMG blueprints with `port-provisioning: 1` ALREADY auto-bind new devices to their `cliprofs` + `pkg` scope members at device-creation time. The tool's template_group + policy_package bind is idempotent and will report `"nothing to add"` in that case — safe, not an error.
 
-**Deferred-not-failed for normalized interfaces:** Fresh model devices have no device-side zones yet (they're created by CLI templates at first install). FMG returns `-10131 datasrc invalid`. **v1.2.0 fixes this** by pre-creating empty zone shells device-side via `set /pm/config/device/{dev}/vdom/{vdom}/system/zone/{zone}` — the shell satisfies validation, CLI template populates real interface members at install time. If the pre-create is disabled (`pre_create_zone_shells: false`) or fails, the tool falls back to marking those as `status: deferred` with a hint.
+**Deferred-not-failed for normalized interfaces:** Fresh model devices have no device-side zones yet (they're created by CLI templates at first install). FMG returns `-10131 datasrc invalid`. **v1.2.0 fixes this** by pre-creating empty zone shells device-side. **v1.2.1 adds `zone_type` per zone** so shells go into the right table:
+
+| zone_type | Shell path | When |
+|---|---|---|
+| `system` *(default)* | `set /pm/config/device/{dev}/vdom/{vdom}/system/zone/{name}` | Plain L2/L3 zone (LAN_ZONE, DMZ_ZONE, ...) — created by a CLI template with `config system zone` |
+| `sdwan` | `set /pm/config/device/{dev}/vdom/{vdom}/system/sdwan/zone/{name}` | SDWAN zone (SDWAN_ZONE, Underlay_ZONE, ...) — created by the SDWAN template. **Required** when the zone name would otherwise collide with an SDWAN zone (`-553 name conflicts with a sdwan zone`) |
+| `none` | *(skip)* | Rely on prior install having created the zone (dynamic_mapping ADD may fail with -10131 on fresh devices) |
 
 ### 🚨 Install-blocker context (v1.2.0)
 
@@ -160,15 +166,20 @@ execute_certified_tool(
 Full auto-bind — CSV + attach to all tenant-scale infrastructure in one shot:
 ```python
 execute_certified_tool(
-    canonical_id="org.ulysses.noc.fortimanager-model-device-import-csv/1.1.0",
+    canonical_id="org.ulysses.noc.fortimanager-model-device-import-csv/1.2.1",
     parameters={
         "fmg_host": "184.73.7.106",
         "adom": "BOR_Customer_1",
-        "csv_path": "C:/Users/howar/Downloads/spoke-2.fmg.csv",
+        "csv_path": "C:/Users/howar/Downloads/spoke-N.fmg.csv",
         "auto_bind": {
             "resolve_from_blueprint": True,   # -> BOR-SINGLE-STD + BOR-SINGLE-STD-PKG
             "device_group": "BOR_Branch_Single",
-            "normalized_interfaces": ["LAN_ZONE", "SDWAN_ZONE", "Underlay_ZONE"],
+            # v1.2.1: per-zone zone_type prevents -553 install collisions
+            "normalized_interfaces": [
+                {"name": "LAN_ZONE",      "zone_type": "system"},   # BOR-04-ZONE-LAN creates as system zone
+                {"name": "SDWAN_ZONE",    "zone_type": "sdwan"},    # BOR-09/SDWAN template creates as sdwan zone
+                {"name": "Underlay_ZONE", "zone_type": "sdwan"},    # same
+            ],
         },
     }
 )
@@ -178,7 +189,8 @@ Live-tested 2026-08-25 on `BOR_Customer_1` importing spoke-2 (SN FGVMMLTM2601204
 - `template_group` + `policy_package`: FMG auto-added at import time (blueprint's `port-provisioning: 1`); tool dedupe reported `"nothing to add"`.
 - `device_group`: code=0 (verify in GUI).
 - `normalized_interfaces` (v1.1.0): all 3 returned `status: deferred, code: -10131` — install then failed with "Dynamic interface 'Underlay_ZONE' mapping undefined for device spoke-2".
-- **v1.2.0 fix:** manual `set /pm/config/device/spoke-2/vdom/root/system/zone/{LAN_ZONE,SDWAN_ZONE,Underlay_ZONE}` shells + re-add dynamic_mapping → all 3 code=0. Now baked in as `pre_create_zone_shells=true` default. Also `set_hostname_from_name=true` default fixes hostname=SN display quirk.
+- **v1.2.0 fix:** pre-create zone shells → dynamic_mapping validated OK. But install then failed with `-553 name conflicts with a sdwan zone` on SDWAN_ZONE + Underlay_ZONE — my `system zone` shells collided with the SDWAN template's `sdwan zone` of the same name.
+- **v1.2.1 fix (verified install-passing):** per-zone `zone_type` — `system` for LAN_ZONE, `sdwan` for SDWAN_ZONE + Underlay_ZONE. Also `set_hostname_from_name=true` default fixes hostname=SN display quirk.
 
 ## Error Handling
 

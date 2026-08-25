@@ -62,17 +62,32 @@ v1.2.0 install-readiness fixes:
 
   B. Normalized-interface dynamic_mapping returned -10131 `datasrc invalid.
      object: system zone`. Root cause: FMG validates the `local-intf` value
-     against the device-DB `system zone` table. Fresh model devices have no
-     zones yet (they'd be created by BOR-04-ZONE-LAN CLI template at
-     install), so validation fails BEFORE install runs and blocks the whole
-     Policy Package copy. Fix: BEFORE adding the dynamic_mapping, `set
-     /pm/config/device/{dev}/vdom/{vdom}/system/zone/{zone}` to create an
-     empty zone shell on the device DB. Now dynamic_mapping validates,
-     install starts, CLI template later populates the zone with real
-     interface members. Idempotent.
+     against the device-DB zone table. Fresh model devices have no zones
+     yet, so validation fails BEFORE install runs and blocks the whole
+     Policy Package copy. Fix: BEFORE adding the dynamic_mapping, `set` a
+     zone shell on the device DB. Now dynamic_mapping validates.
+
+v1.2.1 zone_type per normalized interface (CRITICAL FIX):
+  v1.2.0 always created shells as `system zone`. For SDWAN-typed zones
+  (`SDWAN_ZONE`, `Underlay_ZONE`) this COLLIDED at install with the SDWAN
+  template's `system sdwan zone` of the same name — FortiOS shares the
+  namespace, returns `-553 name conflicts with a sdwan zone`, install
+  aborts partway through Policy Package copy.
+
+  Fix: each normalized_interfaces spec now accepts `zone_type`:
+    - `"system"` (default) — shell created at `system/zone/{name}` (LAN_ZONE)
+    - `"sdwan"`  — shell created at `system/sdwan/zone/{name}` (SDWAN_ZONE,
+                   Underlay_ZONE, etc.)
+    - `"none"`   — skip shell entirely; rely on prior install having created
+                   the zone (dynamic_mapping ADD may fail with -10131)
+
+  Shorthand forms:
+    "LAN_ZONE"                                    -> zone_type=system
+    {"name": "SDWAN_ZONE", "zone_type": "sdwan"}  -> zone_type=sdwan
+    {"name": "X", "local_intf": "Y", "zone_type": "system"}
 
 Author: Ulysses Project
-Version: 1.2.0
+Version: 1.2.1
 """
 
 import asyncio
@@ -194,21 +209,37 @@ def _ensure_device_zone_shell(
     dev_name: str,
     vdom: str,
     zone_name: str,
+    zone_type: str = "system",
 ) -> Dict[str, Any]:
-    """Create an EMPTY system zone shell on the device DB.
+    """Create an EMPTY zone shell on the device DB.
 
     v1.2.0 chicken-and-egg fix: FMG validates dynamic_mapping.local-intf
-    against the device-side `system zone` table. Fresh model devices have
-    no zones. Creating an empty shell (interface=[]) here lets the
-    validation pass. CLI templates fill in the real interface members at
-    install time. Idempotent (set = create-or-update)."""
-    url = f"/pm/config/device/{dev_name}/vdom/{vdom}/system/zone/{zone_name}"
+    against the device-side zone tables. Fresh model devices have no
+    zones. Creating an empty shell lets the validation pass. CLI templates
+    fill in the real interface members at install time. Idempotent
+    (set = create-or-update).
+
+    v1.2.1: `zone_type` controls WHICH zone table:
+      - "system" -> /system/zone/{name}         (plain L2/L3 zone)
+      - "sdwan"  -> /system/sdwan/zone/{name}   (SDWAN zone, avoids -553
+                     namespace collision with the SDWAN template)
+    """
+    if zone_type == "sdwan":
+        url = f"/pm/config/device/{dev_name}/vdom/{vdom}/system/sdwan/zone/{zone_name}"
+    else:
+        url = f"/pm/config/device/{dev_name}/vdom/{vdom}/system/zone/{zone_name}"
     try:
         r = client.call("set", url, data={"name": zone_name})
         st = _status(r)
-        return {"code": st.get("code"), "msg": (st.get("message") or "")[:80]}
+        return {
+            "code": st.get("code"),
+            "msg": (st.get("message") or "")[:80],
+            "zone_type": zone_type,
+            "url": url,
+        }
     except Exception as e:
-        return {"code": -1, "msg": f"{type(e).__name__}: {e}"}
+        return {"code": -1, "msg": f"{type(e).__name__}: {e}",
+                "zone_type": zone_type, "url": url}
 
 
 def _add_dynamic_mapping(
@@ -219,22 +250,24 @@ def _add_dynamic_mapping(
     vdom: str,
     local_intf: str,
     pre_create_zone_shell: bool = True,
+    zone_type: str = "system",
 ) -> Dict[str, Any]:
     """POST a new dynamic_mapping entry to a normalized interface for one device.
 
     v1.2.0: If `pre_create_zone_shell=True` (default), we `set` an empty
-    system zone with the local_intf's name on the device DB FIRST so that
-    FMG's -10131 `datasrc invalid. object: system zone` validation passes.
-    CLI template `BOR-04-ZONE-LAN` populates the zone's interface members
-    at install time.
+    zone shell on the device DB FIRST so that FMG's -10131 `datasrc
+    invalid` validation passes.
 
-    If `pre_create_zone_shell=False` (legacy), skip the shell step; the
-    add will succeed only if the zone already exists device-side (e.g. the
-    device has been installed at least once).
+    v1.2.1: `zone_type` (system|sdwan|none) controls WHICH zone table the
+    shell goes into. "sdwan" avoids the -553 install collision that
+    happens when a system zone shares the name of an SDWAN zone the
+    SDWAN template creates. "none" skips shell creation entirely.
     """
     shell_result = None
-    if pre_create_zone_shell:
-        shell_result = _ensure_device_zone_shell(client, dev_name, vdom, local_intf)
+    if pre_create_zone_shell and zone_type != "none":
+        shell_result = _ensure_device_zone_shell(
+            client, dev_name, vdom, local_intf, zone_type=zone_type,
+        )
         # If shell create failed, still try the mapping — maybe zone existed
         # already from a prior install and we just don't have write access.
 
@@ -247,18 +280,19 @@ def _add_dynamic_mapping(
         msg = (st.get("message") or "")[:160]
         result: Dict[str, Any] = {
             "device": dev_name, "vdom": vdom, "code": code, "msg": msg,
+            "zone_type": zone_type,
         }
-        if pre_create_zone_shell and shell_result is not None:
+        if shell_result is not None:
             result["zone_shell"] = shell_result
         # -10131 should be rare now (we pre-created the zone). If it still
         # hits, mark deferred and hint the user to check zone-shell result.
         if code == -10131:
             result["status"] = "deferred"
             result["hint"] = (
-                "Zone shell create may have failed OR device-side validation "
-                "still blocks. Check `zone_shell` result and manually create "
-                f"the zone via `set /pm/config/device/{dev_name}/vdom/{vdom}"
-                f"/system/zone/{local_intf}`."
+                f"Zone shell create for zone_type={zone_type!r} may have "
+                "failed OR device-side validation still blocks. Check "
+                "`zone_shell` result. If SDWAN template already created the "
+                f"zone as a different type, try zone_type='none' + retry."
             )
         else:
             result["status"] = "ok" if code == 0 else "failed"
@@ -266,6 +300,7 @@ def _add_dynamic_mapping(
     except Exception as e:
         return {"device": dev_name, "vdom": vdom, "code": -1,
                 "msg": f"{type(e).__name__}: {e}", "status": "failed",
+                "zone_type": zone_type,
                 **({"zone_shell": shell_result} if shell_result else {})}
 
 
@@ -408,10 +443,13 @@ def _do_auto_bind(
         ni_out = []
         for spec in ni_specs:
             if isinstance(spec, str):
-                intf_name, local_intf = spec, spec
+                intf_name, local_intf, zone_type = spec, spec, "system"
             elif isinstance(spec, dict):
                 intf_name = spec.get("name") or ""
                 local_intf = spec.get("local_intf") or intf_name
+                zone_type = spec.get("zone_type") or "system"
+                if zone_type not in ("system", "sdwan", "none"):
+                    zone_type = "system"
             else:
                 continue
             if not intf_name:
@@ -421,10 +459,12 @@ def _do_auto_bind(
                 per_dev.append(_add_dynamic_mapping(
                     client, adom, intf_name, entry["name"], entry["vdom"], local_intf,
                     pre_create_zone_shell=pre_create_zone_shells,
+                    zone_type=zone_type,
                 ))
             ni_out.append({
                 "interface": intf_name,
                 "local_intf": local_intf,
+                "zone_type": zone_type,
                 "results": per_dev,
             })
         out["normalized_interfaces"] = ni_out

@@ -1,7 +1,7 @@
 ---
-canonical_id: org.ulysses.noc.fortimanager-model-device-import-csv/1.2.0
+canonical_id: org.ulysses.noc.fortimanager-model-device-import-csv/1.2.1
 name: FortiManager Model Device Import CSV
-version: 1.2.0
+version: 1.2.1
 description: >
   Bulk-create model devices from a CSV file, mirroring the FMG GUI's
   "Add Model Devices from CSV" flow. Reads the CSV locally, parses per FMG
@@ -110,10 +110,20 @@ parameters:
           type: array
           description: >
             Normalized interfaces to add dynamic_mapping for. Each entry is
-            either a string (name; local_intf defaults to same value) or an
-            object {name, local_intf}. For fresh model devices, FMG may
-            return -10131 datasrc invalid (zones don't exist pre-install) —
-            tool marks these as `status: deferred`; re-run bind after install.
+            either a string (name; local_intf defaults to same value,
+            zone_type=system) or an object {name, local_intf, zone_type}.
+
+            v1.2.1: `zone_type` controls WHICH zone table the pre-create
+            shell goes into:
+              - "system" (default): /system/zone/{name} — plain L2/L3 zone
+                (LAN_ZONE, DMZ_ZONE, etc.)
+              - "sdwan":            /system/sdwan/zone/{name} — SDWAN zone
+                (SDWAN_ZONE, Underlay_ZONE, etc.). REQUIRED for zones that
+                share names with what the SDWAN template creates, otherwise
+                install fails with -553 namespace collision.
+              - "none":             skip shell entirely; rely on prior
+                install having created the zone. dynamic_mapping ADD may
+                fail with -10131 on fresh devices.
           items:
             oneOf:
               - type: string
@@ -121,6 +131,7 @@ parameters:
                 properties:
                   name: {type: string}
                   local_intf: {type: string}
+                  zone_type: {type: string, enum: [system, sdwan, none], default: system}
                 required: [name]
 
 output_schema:
