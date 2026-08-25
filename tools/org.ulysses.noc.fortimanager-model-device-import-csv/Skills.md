@@ -71,6 +71,25 @@ FGT50GTK99000002,BOR-SINGLE-STD-50G,spoke-02,2,dhcp,,,,10.2.0.1,255.255.255.0,10
 | `wait` | bool | No | `true` | Poll task to terminal state |
 | `max_wait_sec` | int | No | `120` | |
 | `dry_run` | bool | No | `false` | Return payload without POSTing |
+| `auto_bind` | object | No | *(disabled)* | **v1.1.0** — opt-in post-import bindings. See below. |
+
+### v1.1.0 `auto_bind` — post-import wiring
+
+After the import succeeds (`action: imported`, at least one device created), the tool can attach the new devices to the tenant-scale infrastructure in one shot:
+
+| Field | Type | Effect |
+|---|---|---|
+| `resolve_from_blueprint` | bool | If `true` and template_group/policy_package are omitted, infer them from the FIRST row's blueprint (`cliprofs[0]` + `pkg`). Zero manual config needed. |
+| `template_group` | string | CLI Template Group name — appends new devices to its `scope member`. |
+| `policy_package` | string | Policy Package name — appends new devices to its `scope member`. |
+| `device_group` | string | DVMDB Device Group name — appends new devices to `object member`. ⚠ FMG 7.6.7 API accepts writes (code=0) but has no readback; verify in GUI. |
+| `normalized_interfaces` | array | Normalized interface names to add `dynamic_mapping` for. String = same-name local-intf; `{name, local_intf}` = explicit mapping. |
+
+**Scope-member semantics:** the tool does GET-extend-UPDATE (fetch existing → append new → dedup by `(name, vdom)` → write full list back). FMG's `update` REPLACES, so merging manually prevents wiping existing membership.
+
+**Blueprint auto-magic caveat:** FMG blueprints with `port-provisioning: 1` ALREADY auto-bind new devices to their `cliprofs` + `pkg` scope members at device-creation time. The tool's template_group + policy_package bind is idempotent and will report `"nothing to add"` in that case — safe, not an error.
+
+**Deferred-not-failed for normalized interfaces:** Fresh model devices have no device-side zones yet (they're created by CLI templates at first install). FMG returns `-10131 datasrc invalid` — the tool marks these as `status: deferred` with a hint to re-run after install. Everything else in the response stays green.
 
 ## Interpreting Results
 
@@ -100,9 +119,10 @@ FGT50GTK99000002,BOR-SINGLE-STD-50G,spoke-02,2,dhcp,,,,10.2.0.1,255.255.255.0,10
 
 ## Example
 
+Minimal — CSV only, no auto-bind:
 ```python
 execute_certified_tool(
-    canonical_id="org.ulysses.noc.fortimanager-model-device-import-csv/1.0.0",
+    canonical_id="org.ulysses.noc.fortimanager-model-device-import-csv/1.1.0",
     parameters={
         "fmg_host": "184.73.7.106",
         "adom": "BOR_Customer_1",
@@ -112,6 +132,28 @@ execute_certified_tool(
     }
 )
 ```
+
+Full auto-bind — CSV + attach to all tenant-scale infrastructure in one shot:
+```python
+execute_certified_tool(
+    canonical_id="org.ulysses.noc.fortimanager-model-device-import-csv/1.1.0",
+    parameters={
+        "fmg_host": "184.73.7.106",
+        "adom": "BOR_Customer_1",
+        "csv_path": "C:/Users/howar/Downloads/spoke-2.fmg.csv",
+        "auto_bind": {
+            "resolve_from_blueprint": True,   # -> BOR-SINGLE-STD + BOR-SINGLE-STD-PKG
+            "device_group": "BOR_Branch_Single",
+            "normalized_interfaces": ["LAN_ZONE", "SDWAN_ZONE", "Underlay_ZONE"],
+        },
+    }
+)
+```
+
+Live-tested 2026-08-25 on `BOR_Customer_1` importing spoke-2 (SN FGVMMLTM26012046). Result:
+- `template_group` + `policy_package`: FMG auto-added at import time (blueprint's `port-provisioning: 1`); tool dedupe reported `"nothing to add"`.
+- `device_group`: code=0 (verify in GUI).
+- `normalized_interfaces`: all 3 returned `status: deferred, code: -10131` — zones don't exist pre-install.
 
 ## Error Handling
 

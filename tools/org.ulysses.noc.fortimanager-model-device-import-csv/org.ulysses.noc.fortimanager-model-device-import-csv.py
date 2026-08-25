@@ -31,8 +31,26 @@ Observed GUI payload (single row):
           faz.perm: 15
           faz.quota: 0
 
+v1.1.0 auto-bind (opt-in via `auto_bind`):
+  After a successful import, the tool can automatically attach the new devices
+  to the ADOM's tenant-scale infrastructure:
+    1. CLI Template Group `scope member` — appends each new {name, vdom}
+    2. Policy Package `scope member`     — appends each new {name, vdom}
+    3. Device Group (DVMDB) `object member` — set membership (FMG 7.6.7 API
+       accepts but has no readback path; verify in GUI)
+    4. Normalized Interface `dynamic_mapping` — one entry per new device per
+       named interface, `{_scope: [{name, vdom}], local-intf: [<intf>]}`
+
+  All four are opt-in. If `resolve_from_blueprint=True` and template_group /
+  policy_package are omitted, they are inferred from the first row's blueprint
+  (`cliprofs[0]` and `pkg`).
+
+  The scope-member appends use GET-extend-UPDATE semantics — FMG's `update`
+  on `scope member` REPLACES the whole list, so we merge with existing before
+  writing back. Duplicate {name, vdom} pairs are skipped.
+
 Author: Ulysses Project
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import asyncio
@@ -96,6 +114,240 @@ def _resolve_blueprint_platform(client: FortiManagerClient, adom: str, blueprint
     return plat
 
 
+def _status(resp: Dict[str, Any]) -> Dict[str, Any]:
+    return (resp.get("result", [{}])[0] or {}).get("status") or {}
+
+
+def _member_key(m: Dict[str, str]) -> tuple[str, str]:
+    return (m.get("name") or "", m.get("vdom") or "root")
+
+
+def _append_scope_member(
+    client: FortiManagerClient,
+    named_url: str,
+    new_entries: List[Dict[str, str]],
+    field: str = "scope member",
+) -> Dict[str, Any]:
+    """GET-extend-UPDATE pattern for FMG scope member fields.
+
+    Reads current scope member, merges with new_entries (deduped by (name,vdom)),
+    writes back with `update`. Returns {before, added, after, code, msg}.
+    """
+    try:
+        g = client.get(named_url, fields=["name", field])
+        d = (g.get("result", [{}])[0] or {}).get("data") or {}
+        existing = list(d.get(field) or [])
+        existing_keys = {_member_key(m) for m in existing}
+
+        added: List[Dict[str, str]] = []
+        merged = list(existing)
+        for m in new_entries:
+            if _member_key(m) not in existing_keys:
+                merged.append({"name": m["name"], "vdom": m.get("vdom", "root")})
+                added.append(m)
+
+        if not added:
+            return {"code": 0, "msg": "nothing to add",
+                    "before": len(existing), "added": 0, "after": len(existing)}
+
+        # Send only the object identifier + the field we're changing.
+        obj_name = d.get("name") or named_url.rsplit("/", 1)[-1]
+        r = client.call("update", named_url, data={"name": obj_name, field: merged})
+        st = _status(r)
+        return {
+            "code": st.get("code"),
+            "msg": (st.get("message") or "")[:120],
+            "before": len(existing),
+            "added": len(added),
+            "after": len(merged) if st.get("code") == 0 else len(existing),
+            "added_members": added,
+        }
+    except Exception as e:
+        return {"code": -1, "msg": f"{type(e).__name__}: {e}",
+                "before": None, "added": 0, "after": None}
+
+
+def _add_dynamic_mapping(
+    client: FortiManagerClient,
+    adom: str,
+    intf: str,
+    dev_name: str,
+    vdom: str,
+    local_intf: str,
+) -> Dict[str, Any]:
+    """POST a new dynamic_mapping entry to a normalized interface for one device.
+
+    NOTE: FMG validates `local-intf` against the device-side system zones/
+    interfaces table. For a fresh model device (no install yet) this returns
+    -10131 `datasrc invalid. object: system zone`. Zones only exist after the
+    device's CLI templates (e.g. `config system zone`) have run. This tool
+    marks such results as `status: deferred` — user should re-run this bind
+    AFTER the first install of the device.
+    """
+    url = f"/pm/config/adom/{adom}/obj/dynamic/interface/{intf}/dynamic_mapping"
+    data = {"_scope": [{"name": dev_name, "vdom": vdom}], "local-intf": [local_intf]}
+    try:
+        r = client.call("add", url, data=data)
+        st = _status(r)
+        code = st.get("code")
+        msg = (st.get("message") or "")[:160]
+        # -10131 = device-side zone/intf doesn't exist yet (pre-install chicken-and-egg).
+        # Treat as deferred, not failed.
+        if code == -10131:
+            return {
+                "device": dev_name, "vdom": vdom, "code": code,
+                "msg": msg, "status": "deferred",
+                "hint": "Re-run this bind after the device's first install "
+                        "creates the zone via `config system zone`.",
+            }
+        return {
+            "device": dev_name, "vdom": vdom, "code": code, "msg": msg,
+            "status": "ok" if code == 0 else "failed",
+        }
+    except Exception as e:
+        return {"device": dev_name, "vdom": vdom, "code": -1,
+                "msg": f"{type(e).__name__}: {e}", "status": "failed"}
+
+
+def _resolve_bindings_from_blueprint(
+    client: FortiManagerClient,
+    adom: str,
+    blueprint_name: str,
+) -> Dict[str, Optional[str]]:
+    """Look up cliprofs[0] + pkg from a blueprint. Returns {template_group, policy_package}."""
+    try:
+        r = client.get(f"/pm/config/adom/{adom}/obj/fmg/device/blueprint/{blueprint_name}",
+                       fields=["cliprofs", "pkg"])
+        d = (r.get("result", [{}])[0] or {}).get("data") or {}
+        cliprofs = d.get("cliprofs") or []
+        return {
+            "template_group": (cliprofs[0] if cliprofs else None),
+            "policy_package": d.get("pkg"),
+        }
+    except Exception:
+        return {"template_group": None, "policy_package": None}
+
+
+def _do_auto_bind(
+    client: FortiManagerClient,
+    adom: str,
+    created: List[Dict[str, Any]],
+    auto_bind: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Run the opt-in post-import bindings. `created` is the successful import list."""
+    out: Dict[str, Any] = {}
+    if not created:
+        return out
+
+    resolve = bool(auto_bind.get("resolve_from_blueprint", False))
+    tpl_group = auto_bind.get("template_group")
+    pkg = auto_bind.get("policy_package")
+    dev_group = auto_bind.get("device_group")
+    ni_specs = auto_bind.get("normalized_interfaces") or []
+
+    # Blueprint auto-resolve for template_group + policy_package if not set
+    if resolve and (not tpl_group or not pkg):
+        first_bp = created[0].get("blueprint")
+        if first_bp:
+            resolved = _resolve_bindings_from_blueprint(client, adom, first_bp)
+            if not tpl_group:
+                tpl_group = resolved.get("template_group")
+            if not pkg:
+                pkg = resolved.get("policy_package")
+            out["resolved_from_blueprint"] = {
+                "blueprint": first_bp,
+                "template_group": resolved.get("template_group"),
+                "policy_package": resolved.get("policy_package"),
+            }
+
+    new_entries = [{"name": c["name"], "vdom": "root"} for c in created]
+
+    # 1. CLI Template Group scope member
+    if tpl_group:
+        out["template_group"] = {
+            "group": tpl_group,
+            **_append_scope_member(
+                client,
+                f"/pm/config/adom/{adom}/obj/cli/template-group/{tpl_group}",
+                new_entries,
+            ),
+        }
+
+    # 2. Policy Package scope member
+    if pkg:
+        out["policy_package"] = {
+            "package": pkg,
+            **_append_scope_member(
+                client,
+                f"/pm/pkg/adom/{adom}/{pkg}",
+                new_entries,
+            ),
+        }
+
+    # 3. DVMDB Device Group object member (FMG 7.6.7: code=0 but no API readback)
+    if dev_group:
+        try:
+            # set replaces; use existing + new
+            g = client.get(f"/dvmdb/adom/{adom}/group/{dev_group}", fields=["name"])
+            g_st = _status(g)
+            if g_st.get("code") != 0:
+                out["device_group"] = {
+                    "group": dev_group,
+                    "code": g_st.get("code"),
+                    "msg": f"group not found: {g_st.get('message')}",
+                }
+            else:
+                # DVMDB group has no readback for members, so we can only
+                # add-what's-in-created (we don't know existing membership).
+                r = client.call(
+                    "add",
+                    f"/dvmdb/adom/{adom}/group/{dev_group}/object member",
+                    data=new_entries,
+                )
+                st = _status(r)
+                out["device_group"] = {
+                    "group": dev_group,
+                    "code": st.get("code"),
+                    "msg": (st.get("message") or "")[:120],
+                    "members_submitted": new_entries,
+                    "verified_via_api": False,  # FMG 7.6.7 quirk
+                    "verify_hint": (
+                        f"FMG GUI: Device Manager -> {adom} -> Device Groups -> {dev_group}"
+                    ),
+                }
+        except Exception as e:
+            out["device_group"] = {
+                "group": dev_group, "code": -1, "msg": f"{type(e).__name__}: {e}",
+            }
+
+    # 4. Normalized interface dynamic_mapping (per interface, per new device)
+    if ni_specs:
+        ni_out = []
+        for spec in ni_specs:
+            if isinstance(spec, str):
+                intf_name, local_intf = spec, spec
+            elif isinstance(spec, dict):
+                intf_name = spec.get("name") or ""
+                local_intf = spec.get("local_intf") or intf_name
+            else:
+                continue
+            if not intf_name:
+                continue
+            per_dev = []
+            for entry in new_entries:
+                per_dev.append(_add_dynamic_mapping(
+                    client, adom, intf_name, entry["name"], entry["vdom"], local_intf,
+                ))
+            ni_out.append({
+                "interface": intf_name,
+                "local_intf": local_intf,
+                "results": per_dev,
+            })
+        out["normalized_interfaces"] = ni_out
+
+    return out
+
+
 async def _poll_task(client: FortiManagerClient, task_id: int, max_wait: int) -> tuple[str, int, str]:
     start = time.monotonic()
     state = "pending"
@@ -148,6 +400,8 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
     wait = bool(params.get("wait", True))
     max_wait = int(params.get("max_wait_sec", 120))
     dry_run = bool(params.get("dry_run", False))
+    # v1.1.0: auto-bind (opt-in). None = disabled entirely.
+    auto_bind: Dict[str, Any] = params.get("auto_bind") or {}
 
     # Client + blueprint platform cache
     client = None if dry_run else FortiManagerClient(host=fmg_host)
@@ -278,6 +532,13 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
         overall_ok = (len(failed) == 0) and (task_state == "done")
         action = "imported" if overall_ok else ("partial" if created else "failed")
 
+        # v1.1.0: auto-bind — opt-in via auto_bind dict.
+        # Only run when the import succeeded (partial/failed = skip; user should
+        # re-run after fixing the import errors).
+        bind_out: Dict[str, Any] = {}
+        if auto_bind and created and action != "failed":
+            bind_out = _do_auto_bind(client, adom, created, auto_bind)
+
         return {
             "success": overall_ok,
             "action": action,
@@ -288,6 +549,7 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
             "task_state": task_state,
             "devices_created": created,
             "devices_failed": failed,
+            **({"auto_bind": bind_out} if bind_out else {}),
             **({"error": task_err} if task_err else {}),
         }
 

@@ -1,7 +1,7 @@
 ---
-canonical_id: org.ulysses.noc.fortimanager-model-device-import-csv/1.0.0
+canonical_id: org.ulysses.noc.fortimanager-model-device-import-csv/1.1.0
 name: FortiManager Model Device Import CSV
-version: 1.0.0
+version: 1.1.0
 description: >
   Bulk-create model devices from a CSV file, mirroring the FMG GUI's
   "Add Model Devices from CSV" flow. Reads the CSV locally, parses per FMG
@@ -9,6 +9,14 @@ description: >
   become per-device meta variables), builds a single add-dev-list payload,
   and fires exec /dvm/cmd/add/dev-list. Optional task polling with per-row
   device verification.
+
+  v1.1.0 adds opt-in `auto_bind` post-import: appends new devices to a CLI
+  Template Group scope member, a Policy Package scope member, a DVMDB Device
+  Group, and per-normalized-interface dynamic_mapping. `resolve_from_blueprint`
+  can auto-infer template_group + policy_package from the first row's
+  blueprint (cliprofs[0] + pkg). Note: FMG blueprints with `port-provisioning:
+  1` already auto-bind template + policy scope at device creation — the tool
+  dedupes and reports "nothing to add" in that case.
 status: draft
 
 metadata:
@@ -58,6 +66,46 @@ parameters:
       type: boolean
       default: false
       description: "Parse the CSV and build the payload without POSTing"
+    auto_bind:
+      type: object
+      description: >
+        v1.1.0: Opt-in post-import bindings. Runs ONLY if the import succeeded
+        and at least one device was created. Any missing field is skipped.
+      properties:
+        resolve_from_blueprint:
+          type: boolean
+          default: false
+          description: >
+            If true and template_group/policy_package are omitted, infer them
+            from the first row's blueprint (cliprofs[0] + pkg).
+        template_group:
+          type: string
+          description: "CLI Template Group name to append new devices to (scope member)."
+        policy_package:
+          type: string
+          description: "Policy Package name to append new devices to (scope member)."
+        device_group:
+          type: string
+          description: >
+            DVMDB Device Group name to add new devices to (object member).
+            NOTE: FMG 7.6.7 API accepts the write (code=0) but has no readback —
+            verify in the GUI. See device-group-create tool for details.
+        normalized_interfaces:
+          type: array
+          description: >
+            Normalized interfaces to add dynamic_mapping for. Each entry is
+            either a string (name; local_intf defaults to same value) or an
+            object {name, local_intf}. For fresh model devices, FMG may
+            return -10131 datasrc invalid (zones don't exist pre-install) —
+            tool marks these as `status: deferred`; re-run bind after install.
+          items:
+            oneOf:
+              - type: string
+              - type: object
+                properties:
+                  name: {type: string}
+                  local_intf: {type: string}
+                required: [name]
 
 output_schema:
   type: object
@@ -71,6 +119,12 @@ output_schema:
     task_state: {type: string}
     devices_created: {type: array, items: {type: object}, description: "Per-row: {name, sn, blueprint, oid, in_dvm}"}
     devices_failed: {type: array, items: {type: object}}
+    auto_bind:
+      type: object
+      description: >
+        v1.1.0: Post-import binding results (present only if auto_bind was
+        provided and the import succeeded). Keys: resolved_from_blueprint,
+        template_group, policy_package, device_group, normalized_interfaces.
     payload_sent: {type: object}
     error: {type: string}
 
