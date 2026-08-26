@@ -67,7 +67,7 @@ Numbered `BOR-01..BOR-11` with a bump to `BOR-20+` for role-specific additions. 
 |---|---|---|
 | `BOR-01-SYSTEM-GLOBAL` | hostname, alias, admin, timezone, fortiguard | includes `set accprofile "super_admin"` (FMG install-check requires) |
 | `BOR-03-INTERFACES-VM` | port1 + port2 physical interfaces w/ MTU 9001 | VM-specific: `set vdom "root"` + `set type physical` REQUIRED |
-| `BOR-03-INTERFACES-30G` | wan + lan1 physical interfaces, no MTU-override | HW-specific: omits vdom/type/mtu |
+| `BOR-03-INTERFACES-HW` | wan + lan1 physical interfaces, no MTU-override | HW-specific: omits vdom/type/mtu |
 | `BOR-04-ZONE-LAN` | `config system zone LAN_ZONE / set interface {{ LAN_PORT }}` | Same for VM + HW |
 | `BOR-05-IPSEC-P1-P2` | 2 IPsec tunnels to BOR PoPs | DDNS+SEED_PSK based |
 | `BOR-07-STATIC-ROUTES` | 6 static routes (WAN default, PoP /32s, PoP FQDN via WAN, bastion) | Route 10 precedence: `WAN_MODE=dhcp → dynamic-gateway > MGMT_GATEWAY > WAN_GATEWAY` (fixed 2026-08-26) |
@@ -79,7 +79,7 @@ Numbered `BOR-01..BOR-11` with a bump to `BOR-20+` for role-specific additions. 
 | Template | Purpose | Used for |
 |---|---|---|
 | `BOR-02-GREENFIELD-VM` | Only `config firewall policy purge` | VM (nothing else exists by default) |
-| `BOR-02-GREENFIELD-30G` | + `dhcp server purge`, `virtual-switch purge`, `firewall address delete "lan"` | 30G, 50G HW (small class) |
+| `BOR-02-GREENFIELD-HW-SMALL` | + `dhcp server purge`, `virtual-switch purge`, `firewall address delete "lan"` | 30G, 50G HW (small class) |
 | `BOR-02-GREENFIELD-120G` | + `dhcp server edit 1 → ip-range purge → delete 1`, `virtual-switch edit "lan" → port purge → delete "lan"` | 120G (deeper drill) |
 
 **Rule**: DO NOT include `y` confirmation lines in template scripts — FMG auto-confirms interactive purge prompts.
@@ -91,10 +91,10 @@ Container that bundles templates in emit order. Blueprint's `cliprofs` field ref
 | Group | Members | Reused by |
 |---|---|---|
 | `BOR-SINGLE-STD` | BOR-01, BOR-03-INTERFACES-**VM**, BOR-04..BOR-11 | VM blueprint |
-| `BOR-SINGLE-STD-30G` | BOR-01, BOR-03-INTERFACES-**30G**, BOR-04..BOR-11 | 30G, 50G, 120G blueprints (port names via meta vars) |
+| `BOR-SINGLE-STD-HW` | BOR-01, BOR-03-INTERFACES-**30G**, BOR-04..BOR-11 | 30G, 50G, 120G blueprints (port names via meta vars) |
 | `BOR-SPA-HUB-STD-*` (future) | BOR-01..BOR-11 + BOR-20+ SPA-hub additions | SPA hub blueprints |
 
-**Naming caveat**: `BOR-SINGLE-STD-30G` reads as "30G-only" but is actually used by 30G+50G+120G blueprints. Consider renaming to `BOR-SINGLE-STD-HW` in a future cleanup pass.
+**Naming rationale**: `BOR-SINGLE-STD-HW` is deliberately platform-agnostic — used by 30G, 50G, AND 120G blueprints. Port names (`wan`/`lan1` for 30G/50G, `port1`/`port16` for 120G) come from CSV meta vars, not the template body.
 
 ### 2.5 Policy Package
 
@@ -114,9 +114,9 @@ The atomic unit an SE picks by name. Contains platform + templates + prerun + pa
 | Blueprint | Platform | cliprofs | prerun-cliprof | pkg | Live oid |
 |---|---|---|---|---|---|
 | `BOR-SINGLE-STD-VM` | FortiGate-VM64-KVM | `[BOR-SINGLE-STD]` | `[BOR-02-GREENFIELD-VM]` | `BOR-SINGLE-STD-PKG` | 6594 |
-| `BOR-SINGLE-STD-30G` | FortiGate-30G | `[BOR-SINGLE-STD-30G]` | `[BOR-02-GREENFIELD-30G]` | `BOR-SINGLE-STD-PKG` | 7392 |
-| `BOR-SINGLE-STD-50G` | FortiGate-50G | `[BOR-SINGLE-STD-30G]` (reuse) | `[BOR-02-GREENFIELD-30G]` (reuse) | `BOR-SINGLE-STD-PKG` (reuse) | 7411 |
-| `BOR-SINGLE-STD-120G` | FortiGate-120G | `[BOR-SINGLE-STD-30G]` (reuse) | `[BOR-02-GREENFIELD-120G]` (new) | `BOR-SINGLE-STD-PKG` (reuse) | 7432 |
+| `BOR-SINGLE-STD-HW` | FortiGate-30G | `[BOR-SINGLE-STD-HW]` | `[BOR-02-GREENFIELD-HW-SMALL]` | `BOR-SINGLE-STD-PKG` | 7392 |
+| `BOR-SINGLE-STD-50G` | FortiGate-50G | `[BOR-SINGLE-STD-HW]` (reuse) | `[BOR-02-GREENFIELD-HW-SMALL]` (reuse) | `BOR-SINGLE-STD-PKG` (reuse) | 7411 |
+| `BOR-SINGLE-STD-120G` | FortiGate-120G | `[BOR-SINGLE-STD-HW]` (reuse) | `[BOR-02-GREENFIELD-120G]` (new) | `BOR-SINGLE-STD-PKG` (reuse) | 7432 |
 
 **Key flags on every blueprint**:
 - `prov-type: 1` (templates)
@@ -188,7 +188,7 @@ execute_certified_tool(
         "adom": "BOR_Customer_1",
         "csv_path": "C:/.../fmg-export/hardware-blueprints/30G/DHCP-WAN-30G-spoke-4.fmg.csv",
         "auto_bind": {
-            "resolve_from_blueprint": True,   # -> BOR-SINGLE-STD-30G + BOR-SINGLE-STD-PKG
+            "resolve_from_blueprint": True,   # -> BOR-SINGLE-STD-HW + BOR-SINGLE-STD-PKG
             "device_group": "BOR_Branch_Single",
             "normalized_interfaces": [
                 {"name": "LAN_ZONE",      "zone_type": "system"},  # LAN_PORT is a real system zone
@@ -255,10 +255,10 @@ Consistent naming keeps the workflow legible for SEs and repeatable across tenan
 | Layer | Pattern | Example |
 |---|---|---|
 | Meta vars | `SCREAMING_SNAKE_CASE` | `WAN_MODE`, `POP1_FQDN`, `SITE_BW_MBPS` |
-| CLI templates | `BOR-{NN}-{PURPOSE}[-{platform-family}]` | `BOR-01-SYSTEM-GLOBAL`, `BOR-03-INTERFACES-30G`, `BOR-02-GREENFIELD-120G` |
-| CLI template groups | `BOR-{ROLE}-STD[-{platform-family}]` | `BOR-SINGLE-STD`, `BOR-SINGLE-STD-30G`, `BOR-SPA-HUB-STD` |
+| CLI templates | `BOR-{NN}-{PURPOSE}[-{platform-family}]` | `BOR-01-SYSTEM-GLOBAL`, `BOR-03-INTERFACES-HW`, `BOR-02-GREENFIELD-120G` |
+| CLI template groups | `BOR-{ROLE}-STD[-{platform-family}]` | `BOR-SINGLE-STD`, `BOR-SINGLE-STD-HW`, `BOR-SPA-HUB-STD` |
 | Policy packages | `BOR-{ROLE}-STD-PKG` | `BOR-SINGLE-STD-PKG`, `BOR-SPA-HUB-STD-PKG` |
-| Blueprints | `BOR-{ROLE}-STD-{platform}` | `BOR-SINGLE-STD-VM`, `BOR-SINGLE-STD-30G`, `BOR-SPA-HUB-STD-120G` |
+| Blueprints | `BOR-{ROLE}-STD-{platform}` | `BOR-SINGLE-STD-VM`, `BOR-SINGLE-STD-HW`, `BOR-SPA-HUB-STD-120G` |
 | Device groups | `BOR_Branch_{Role}` (underscore, matches FMG UI convention for groups) | `BOR_Branch_Single`, `BOR_Branch_SPA_Hub` |
 | Normalized interfaces | `{PURPOSE}_ZONE` | `LAN_ZONE`, `SDWAN_ZONE`, `Underlay_ZONE` |
 | Devices | `[{platform-prefix}-]spoke-{site_id}` | `spoke-1` (VM), `30G-spoke-4`, `120G-spoke-6` |
@@ -316,7 +316,7 @@ Every quirk below cost hours of debugging on a real deployment. All are baked in
 
 **Cause**: FMG install-check is STRICTER than FortiOS. Model VM devices need `set vdom "root"` + `set type physical` inside every interface edit. HW devices don't.
 
-**Fix**: `BOR-03-INTERFACES-VM` includes these lines; `BOR-03-INTERFACES-30G` (used by HW) omits them.
+**Fix**: `BOR-03-INTERFACES-VM` includes these lines; `BOR-03-INTERFACES-HW` (used by HW) omits them.
 
 ### 5.8 -9001 admin missing accprofile
 
@@ -441,7 +441,7 @@ As of the last update to this doc, `BOR_Customer_1` on `184.73.7.106` contains:
 - **48 metadata variables** (30 tenant + 17 site + 1 pre-existing `vm_interface_number`)
 - **3 normalized interfaces** with 45 platform_mapping entries each (LAN_ZONE / SDWAN_ZONE / Underlay_ZONE)
 - **14 CLI templates** (BOR-01..BOR-11 shared + BOR-02-GREENFIELD-{VM,30G,120G} + BOR-03-INTERFACES-{VM,30G})
-- **2 CLI Template Groups** (BOR-SINGLE-STD, BOR-SINGLE-STD-30G)
+- **2 CLI Template Groups** (BOR-SINGLE-STD, BOR-SINGLE-STD-HW)
 - **1 Policy Package** (BOR-SINGLE-STD-PKG) with 3 addresses + 3 policies + 2 shapers + 1 shaping-policy
 - **4 Device Blueprints** (BOR-SINGLE-STD-VM, -30G, -50G, -120G)
 - **4 Device Groups** (BOR_Branch, BOR_Branch_Single, BOR_Branch_Dual, BOR_Branch_SPA_Hub)
