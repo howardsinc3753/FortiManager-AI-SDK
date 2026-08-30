@@ -47,7 +47,7 @@ config system sdwan
     config service
         edit 1
             set name "Private-Access"
-            set dst "RFC1918_10" "RFC1918_172" "RFC1918_192"
+            set dst "RFC1918-10" "RFC1918-172" "RFC1918-192"
             set priority-members 4
             set tie-break fib-best-match
         next
