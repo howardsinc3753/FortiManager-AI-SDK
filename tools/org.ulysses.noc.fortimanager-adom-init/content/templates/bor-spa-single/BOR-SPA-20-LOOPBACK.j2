@@ -1,0 +1,14 @@
+{% if HUB_LOOPBACK %}config system interface
+    edit "SASE_Hub_Lo"
+        set ip {{ HUB_LOOPBACK }} 255.255.255.255
+        set allowaccess ping
+        set type loopback
+        set vdom root
+    next
+end
+config firewall address
+    edit "SASE_Hub-Loopback"
+        set subnet {{ HUB_LOOPBACK }} 255.255.255.255
+    next
+end
+{% endif %}

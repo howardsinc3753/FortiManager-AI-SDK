@@ -1,0 +1,82 @@
+# Tenant Defaults — Example
+#
+# Copy this file to your own tenant config (e.g., `my-customer.yaml`) and
+# override any of the values below. Pass via --tenant-config to the
+# fortimanager-adom-init tool.
+#
+# Values here BECOME the ADOM meta var defaults. Per-device values (per site)
+# get set separately via the CSV importer at Phase 2 (model-device-import-csv).
+#
+# What you'll customize per tenant:
+#   - ADMIN_PASSWORD  : FortiGate admin password (rotate per tenant!)
+#   - SEED_PSK        : IPsec pre-shared key (rotate per tenant!)
+#   - POP1_FQDN       : Real BOR PoP FQDN from FortiSASE tenant provisioning
+#   - POP2_FQDN       : Real BOR PoP FQDN from FortiSASE tenant provisioning
+#   - Anything site-specific (ideally left blank -> filled per-device via CSV)
+
+# --- Tenant identity (safe defaults; override strongly recommended) ---
+ADMIN_PASSWORD: "CHANGE-ME-per-tenant!"
+SEED_PSK: "CHANGE-ME-per-tenant!"
+
+# --- Real FortiSASE tenant PoP FQDNs (get from FortiSASE portal) ---
+POP1_FQDN: "ipsec-<your-tenant-id>-mia-f3.prod.fortisase.com"
+POP2_FQDN: "ipsec-<your-tenant-id>-dfw-f3.prod.fortisase.com"
+
+# --- Static / typically-shared values (rarely change per tenant) ---
+BASTION_IP: "66.110.253.68"
+BASTION_MASK: "255.255.255.255"
+BGP_AS: "65001"
+BGP_HOLDTIME: "6"
+BGP_KEEPALIVE: "2"
+ONRAMP_DHGRP: "5 14"
+ONRAMP_NETWORK_ID: "0"
+ONRAMP_PROPOSAL: "aes256-sha256"
+FAIL_COMMUNITY: "65001:64911"
+FAIL_LOCAL_PREF: "50"
+POP1_BOR_NODE: "172.16.0.1"
+POP1_COMMUNITY: "65001:10"
+POP1_LOCAL_PREF: "200"
+POP1_NAME: "Primary"
+POP1_PROBE: "64.6.64.6"
+POP2_BOR_NODE: "172.16.8.1"
+POP2_COMMUNITY: "65001:20"
+POP2_LOCAL_PREF: "100"
+POP2_NAME: "Secondary"
+POP2_PROBE: "64.6.65.6"
+SLA_JITTER_MS: "50"
+SLA_LATENCY_MS: "250"
+SLA_PKTLOSS_PCT: "5"
+
+# --- SPA hub fabric (tenant-scope) ---
+FABRIC_NETWORK_ID: "1"
+HUB_PROPOSAL: "aes256-sha256 aes256-sha384 aes256-sha512 aes128-sha256"
+
+# --- Device defaults (blank = leave ADOM default; overridden per-device via CSV) ---
+ADMIN_SPORT: "10443"
+ADMIN_TIMEOUT: "480"
+DEVICE_ALIAS: "FortiGate-ARM64-AWS"
+HOSTNAME: "bor-site-XX"
+TIMEZONE: "US/Pacific"
+LAN_IP: "10.0.0.1"
+LAN_MASK: "255.255.255.0"
+LAN_PORT: "port2"
+LAN_SUBNET: "10.0.0.0"
+MGMT_GATEWAY: ""
+ROUTER_ID: "10.30.1.100"
+SITE_BW_DOWN_MBPS: "0"
+SITE_BW_MBPS: "100"
+SITE_ID: "0"
+WAN_DHCP_DIST: "20"
+WAN_GATEWAY: ""
+WAN_IP: ""
+WAN_MASK: "255.255.255.0"
+WAN_MODE: "dhcp"
+WAN_PORT: "port1"
+
+# --- SPA hub site-scope defaults (blank = filled per hub via CSV) ---
+HUB_LOOPBACK: ""
+FABRIC_OVERLAY: ""
+FABRIC_HUB_IP: ""
+FABRIC_HUB_REMOTE: ""
+FABRIC_POOL_START: ""
+FABRIC_POOL_END: ""

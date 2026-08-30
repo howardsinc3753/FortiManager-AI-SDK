@@ -1,0 +1,21 @@
+config firewall policy
+    purge
+end
+
+config system dhcp server
+    edit 1
+        config ip-range
+            purge
+        end
+    next
+    delete 1
+end
+
+config system virtual-switch
+    edit "lan"
+        config port
+            purge
+        end
+    next
+    delete "lan"
+end

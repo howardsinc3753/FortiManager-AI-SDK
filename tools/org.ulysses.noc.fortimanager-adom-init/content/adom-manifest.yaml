@@ -1,0 +1,545 @@
+manifest_version: '1.0'
+adom_role_bundle: bor-sase-single-circuit-plus-spa-hub
+description: 'Full BOR-SASE MSSP ADOM state: single-circuit spoke role + SPA hub role across VM+30G+50G+120G platforms'
+meta_vars:
+- name: ADMIN_PASSWORD
+  default: FortiSASE-OnRamp-2026!
+  description: Admin password (POC default; per-device via CSV)
+- name: ADMIN_SPORT
+  default: '10443'
+  description: Admin GUI port (off 443 to avoid IKE-over-TCP conflict)
+- name: ADMIN_TIMEOUT
+  default: '480'
+  description: Admin idle timeout minutes
+- name: BASTION_IP
+  default: 66.110.253.68
+  description: Mgmt/bastion return path IP
+- name: BASTION_MASK
+  default: 255.255.255.255
+  description: Bastion netmask
+- name: BGP_AS
+  default: '65001'
+  description: Tenant iBGP AS
+- name: BGP_HOLDTIME
+  default: '6'
+  description: BGP holdtime seconds
+- name: BGP_KEEPALIVE
+  default: '2'
+  description: BGP keepalive seconds
+- name: DEVICE_ALIAS
+  default: FortiGate-ARM64-AWS
+  description: Default device alias (fleet label)
+- name: FABRIC_HUB_IP
+  default: ''
+  description: 'Derived: host(FABRIC_OVERLAY, 253) - SASE_Hub tunnel IP'
+- name: FABRIC_HUB_REMOTE
+  default: ''
+  description: 'Derived: host(FABRIC_OVERLAY, 254) - SASE_Hub remote-ip'
+- name: FABRIC_NETWORK_ID
+  default: '1'
+  description: Fabric tunnel network-id (avoid collision w/ on-ramp)
+- name: FABRIC_OVERLAY
+  default: ''
+  description: Per-device hub SPA overlay /24
+- name: FABRIC_POOL_END
+  default: ''
+  description: 'Derived: host(FABRIC_OVERLAY, 252) - spoke pool end'
+- name: FABRIC_POOL_START
+  default: ''
+  description: 'Derived: host(FABRIC_OVERLAY, 1) - spoke pool start'
+- name: FAIL_COMMUNITY
+  default: 65001:64911
+  description: Fail community (SLA-degraded path)
+- name: FAIL_LOCAL_PREF
+  default: '50'
+  description: Fail local-pref
+- name: HOSTNAME
+  default: bor-site-XX
+  description: Device hostname (per-device via CSV)
+- name: HUB_LOOPBACK
+  default: ''
+  description: Per-device hub loopback IP (blank omits loopback)
+- name: HUB_PROPOSAL
+  default: aes256-sha256 aes256-sha384 aes256-sha512 aes128-sha256
+  description: SASE_Hub phase1 proposal
+- name: LAN_IP
+  default: 10.0.0.1
+  description: LAN interface IP
+- name: LAN_MASK
+  default: 255.255.255.0
+  description: LAN netmask
+- name: LAN_PORT
+  default: port2
+  description: LAN physical port (VM=port2, 30G=lan1, 50G=lan1, 120G=port16)
+- name: LAN_SUBNET
+  default: 10.0.0.0
+  description: 'LAN network (derived by generator: network(LAN_IP, LAN_MASK))'
+- name: MGMT_GATEWAY
+  default: ''
+  description: Explicit next-hop for bastion/mgmt (required if WAN dhcp)
+- name: ONRAMP_DHGRP
+  default: 5 14
+  description: IPsec DH groups
+- name: ONRAMP_NETWORK_ID
+  default: '0'
+  description: IPsec network-id (must match FortiSASE)
+- name: ONRAMP_PROPOSAL
+  default: aes256-sha256
+  description: IPsec phase1/2 proposal
+- name: POP1_BOR_NODE
+  default: 172.16.0.1
+  description: PoP1 BOR node BGP peer IP
+- name: POP1_COMMUNITY
+  default: '65001:10'
+  description: PoP1 BGP community (preferred)
+- name: POP1_FQDN
+  default: ipsec-6rmg0ph0-mia-f3.prod.fortisase.com
+  description: PoP1 (Primary) FQDN - Miami
+- name: POP1_LOCAL_PREF
+  default: '200'
+  description: PoP1 local-pref (spoke->hub best-path)
+- name: POP1_NAME
+  default: Primary
+  description: PoP1 tunnel-interface name (BOR_Primary)
+- name: POP1_PROBE
+  default: 64.6.64.6
+  description: PoP1 SLA probe IP (unique per HC)
+- name: POP2_BOR_NODE
+  default: 172.16.8.1
+  description: PoP2 BOR node BGP peer IP
+- name: POP2_COMMUNITY
+  default: '65001:20'
+  description: PoP2 BGP community (backup)
+- name: POP2_FQDN
+  default: ipsec-6rmg0ph0-dfw-f3.prod.fortisase.com
+  description: PoP2 (Secondary) FQDN - Dallas
+- name: POP2_LOCAL_PREF
+  default: '100'
+  description: PoP2 local-pref
+- name: POP2_NAME
+  default: Secondary
+  description: PoP2 tunnel-interface name (BOR_Secondary)
+- name: POP2_PROBE
+  default: 64.6.65.6
+  description: PoP2 SLA probe IP
+- name: ROUTER_ID
+  default: 10.30.1.100
+  description: BGP router-id (unique in 10.30.1.0/24, avoid .1-.6)
+- name: SEED_PSK
+  default: FortiSASE-OnRamp-2026!
+  description: IPsec pre-shared key (all tunnels POC)
+- name: SITE_BW_DOWN_MBPS
+  default: '0'
+  description: Site download Mbps (0 = same as up)
+- name: SITE_BW_MBPS
+  default: '100'
+  description: Site bandwidth Mbps
+- name: SITE_ID
+  default: '0'
+  description: Site ID (per-device, drives site community)
+- name: SLA_JITTER_MS
+  default: '50'
+  description: Jitter threshold ms
+- name: SLA_LATENCY_MS
+  default: '250'
+  description: Latency threshold ms
+- name: SLA_PKTLOSS_PCT
+  default: '5'
+  description: Packet loss threshold percent
+- name: TIMEZONE
+  default: US/Pacific
+  description: Tenant timezone (FortiOS system global)
+- name: WAN_DHCP_DIST
+  default: '20'
+  description: DHCP-learned default route distance
+- name: WAN_GATEWAY
+  default: ''
+  description: WAN gateway if static
+- name: WAN_IP
+  default: ''
+  description: WAN IP if static
+- name: WAN_MASK
+  default: 255.255.255.0
+  description: WAN netmask if static
+- name: WAN_MODE
+  default: dhcp
+  description: static or dhcp
+- name: WAN_PORT
+  default: port1
+  description: WAN physical port (VM=port1, 30G=wan, 50G=wan, 120G=port1)
+- name: vm_interface_number
+  default: '1'
+  description: predefined variable for set fgtvm interface number
+normalized_interfaces:
+- name: LAN_ZONE
+  description: LAN interface zone - resolves to LAN_ZONE on each device (CLI templates create the actual zone)
+  zone_type: system
+  use_shared_platform_list: true
+  intf_zone: LAN_ZONE
+- name: SDWAN_ZONE
+  description: SDWAN Zone
+  zone_type: sdwan
+  use_shared_platform_list: true
+  intf_zone: SDWAN_ZONE
+- name: Underlay_ZONE
+  description: SDWAN Zone
+  zone_type: sdwan
+  use_shared_platform_list: true
+  intf_zone: Underlay_ZONE
+template_groups:
+- name: BOR-SINGLE-STD
+  description: FortiSASE BOR single-circuit standard VM tuned - green-field sla_failover bgp_communities controlled_firmware ON - ordered per emit_order
+  members:
+  - BOR-01-SYSTEM-GLOBAL
+  - BOR-03-INTERFACES-VM
+  - BOR-04-ZONE-LAN
+  - BOR-05-IPSEC-P1-P2
+  - BOR-07-STATIC-ROUTES
+  - BOR-08-BGP
+  - BOR-09-SDWAN-BASE
+  - BOR-11-SDWAN-RULES
+- name: BOR-SINGLE-STD-HW
+  description: FortiSASE BOR single circuit shared HW template group used by 30G, 50G, 120G blueprints
+  members:
+  - BOR-01-SYSTEM-GLOBAL
+  - BOR-03-INTERFACES-HW
+  - BOR-04-ZONE-LAN
+  - BOR-05-IPSEC-P1-P2
+  - BOR-07-STATIC-ROUTES
+  - BOR-08-BGP
+  - BOR-09-SDWAN-BASE
+  - BOR-11-SDWAN-RULES
+- name: BOR-SPA-SINGLE-STD-HW
+  description: SPA hub single circuit for HW 30G 50G 120G - Extreme Fork isolation from spoke
+  members:
+  - BOR-SPA-01-SYSTEM-GLOBAL
+  - BOR-SPA-03-INTERFACES-HW
+  - BOR-SPA-04-ZONE-LAN
+  - BOR-SPA-05-IPSEC-P1-P2
+  - BOR-SPA-20-LOOPBACK
+  - BOR-SPA-21-SASE-HUB-IPSEC
+  - BOR-SPA-22-STATIC-ROUTES
+  - BOR-SPA-23-BGP-RR
+  - BOR-SPA-24-SDWAN
+- name: BOR-SPA-SINGLE-STD-VM
+  description: SPA hub single circuit for VM - Extreme Fork isolation from spoke
+  members:
+  - BOR-SPA-01-SYSTEM-GLOBAL
+  - BOR-SPA-03-INTERFACES-VM
+  - BOR-SPA-04-ZONE-LAN
+  - BOR-SPA-05-IPSEC-P1-P2
+  - BOR-SPA-20-LOOPBACK
+  - BOR-SPA-21-SASE-HUB-IPSEC
+  - BOR-SPA-22-STATIC-ROUTES
+  - BOR-SPA-23-BGP-RR
+  - BOR-SPA-24-SDWAN
+policy_packages:
+- name: BOR-SINGLE-STD-PKG
+  type: pkg
+  policies:
+  - policyid: 1
+    name: LAN to BOR (SIA)
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 0
+    logtraffic: 2
+  - policyid: 2
+    name: BOR to LAN (return)
+    srcintf:
+    - SDWAN_ZONE
+    dstintf:
+    - LAN_ZONE
+    srcaddr:
+    - all
+    dstaddr:
+    - LOCAL-LAN
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 0
+    logtraffic: 2
+  - policyid: 3
+    name: LAN to Underlay (fallback)
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - Underlay_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 1
+    logtraffic: 2
+  shaping_policies:
+  - id: 1
+    name: BOR_OUTBOUND_SHAPER
+    service:
+    - ALL
+    srcaddr:
+    - all
+    dstaddr:
+    - all
+    dstintf:
+    - SDWAN_ZONE
+    traffic_shaper:
+    - BOR_UP_SHAPER
+    traffic_shaper_reverse:
+    - BOR_DOWN_SHAPER
+- name: BOR-SPA-SINGLE-STD-PKG
+  type: pkg
+  policies:
+  - policyid: 1
+    name: SDWAN-Hairpin (spoke-to-spoke)
+    srcintf:
+    - SDWAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - all
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 0
+    logtraffic: 2
+  - policyid: 2
+    name: LAN to BOR Private no-SNAT
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - RFC1918-10
+    - RFC1918-172
+    - RFC1918-192
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 0
+    logtraffic: 2
+  - policyid: 3
+    name: LAN to BOR Internet SIA SNAT
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 1
+    logtraffic: 2
+  - policyid: 4
+    name: BOR to LAN return
+    srcintf:
+    - SDWAN_ZONE
+    dstintf:
+    - LAN_ZONE
+    srcaddr:
+    - all
+    dstaddr:
+    - LOCAL-LAN
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 0
+    logtraffic: null
+  - policyid: 6
+    name: LAN to Underlay fallback
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - Underlay_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 1
+    logtraffic: 2
+  shaping_policies:
+  - id: 1
+    name: BOR_OUTBOUND_SHAPER
+    service:
+    - ALL
+    srcaddr:
+    - all
+    dstaddr:
+    - all
+    dstintf:
+    - SDWAN_ZONE
+    traffic_shaper:
+    - BOR_UP_SHAPER
+    traffic_shaper_reverse:
+    - BOR_DOWN_SHAPER
+firewall_addresses:
+- name: BOR_Primary_PUBLIC
+  type: 2
+  subnet:
+  - 0.0.0.0
+  - 0.0.0.0
+  fqdn: ipsec-6rmg0ph0-dfw-f3.prod.fortisase.com
+  allow_routing: 1
+- name: BOR_Secondary_PUBLIC
+  type: 2
+  subnet:
+  - 0.0.0.0
+  - 0.0.0.0
+  fqdn: ipsec-6rmg0ph0-mia-f3.prod.fortisase.com
+  allow_routing: 1
+- name: LOCAL-LAN
+  type: 0
+  subnet:
+  - $(LAN_SUBNET)
+  - $(LAN_MASK)
+  allow_routing: 0
+shapers:
+- name: BOR_DOWN_SHAPER
+  guaranteed_bandwidth: 0
+  maximum_bandwidth: 100
+  bandwidth_unit: 1
+- name: BOR_UP_SHAPER
+  guaranteed_bandwidth: 0
+  maximum_bandwidth: 100
+  bandwidth_unit: 1
+blueprints:
+- name: BOR-SINGLE-STD-120G
+  platform: FortiGate-120G
+  prov_type: 1
+  cliprofs:
+  - BOR-SINGLE-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-120G
+  pkg: BOR-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SINGLE-STD-30G
+  platform: FortiGate-30G
+  prov_type: 1
+  cliprofs:
+  - BOR-SINGLE-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SINGLE-STD-50G
+  platform: FortiGate-50G
+  prov_type: 1
+  cliprofs:
+  - BOR-SINGLE-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SINGLE-STD-VM
+  platform: FortiGate-VM64-KVM
+  prov_type: 1
+  cliprofs:
+  - BOR-SINGLE-STD
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-VM
+  pkg: BOR-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-SINGLE-STD-120G
+  platform: FortiGate-120G
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-SINGLE-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-120G
+  pkg: BOR-SPA-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-SINGLE-STD-30G
+  platform: FortiGate-30G
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-SINGLE-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-SPA-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-SINGLE-STD-50G
+  platform: FortiGate-50G
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-SINGLE-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-SPA-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-SINGLE-STD-VM
+  platform: FortiGate-VM64-KVM
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-SINGLE-STD-VM
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-VM
+  pkg: BOR-SPA-SINGLE-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+device_groups:
+- name: BOR_Branch_Dual
+  description: Dual-BOR branches (two WAN circuits + two SASE tunnels per site)
+  type: normal
+  os_type: fos
+- name: BOR_Branch_SPA_Hub
+  description: FortiSASE BOR sites acting as SPA Hub - hairpin spoke to spoke via SDWAN zone
+  type: normal
+  os_type: fos
+- name: BOR_Branch_Single
+  description: Single-BOR branches (one WAN circuit + one SASE tunnel per site)
+  type: normal
+  os_type: fos
+template_paths:
+  bor_single_dir: templates/bor-single
+  bor_spa_single_dir: templates/bor-spa-single

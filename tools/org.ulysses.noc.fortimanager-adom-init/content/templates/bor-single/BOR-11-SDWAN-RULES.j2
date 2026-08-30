@@ -1,0 +1,39 @@
+config system sdwan
+    config service
+        edit 1
+            set name "BOR_Private_Access"
+            set mode sla
+            set dst "RFC1918"
+            set tie-break cfg-order
+            set priority-members 1 2
+            config sla
+                edit "HC_{{ POP1_NAME }}"
+                    set id 1
+                next
+                edit "HC_{{ POP2_NAME }}"
+                    set id 1
+                next
+            end
+        next
+        edit 2
+            set name "INET_via_BOR"
+            set mode sla
+            set dst "all"
+            set tie-break cfg-order
+            set priority-members 1 2
+            config sla
+                edit "HC_{{ POP1_NAME }}"
+                    set id 1
+                next
+                edit "HC_{{ POP2_NAME }}"
+                    set id 1
+                next
+            end
+        next
+        edit 5
+            set name "Underlay_fallback"
+            set dst "all"
+            set priority-members 3
+        next
+    end
+end

@@ -1,0 +1,93 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-adom-init/1.0.0
+name: FortiManager ADOM Init
+version: 1.0.0
+description: >
+  Bootstrap a fresh FortiManager ADOM with the full BOR-SASE state - the
+  Phase 1 (ADOM prep) of the BOR-SASE deployment workflow. Creates 56 meta
+  vars, 3 normalized interfaces (45 platform_mapping each), 22 CLI templates
+  (12 spoke + 10 SPA hub, from .j2 files), 4 template groups, 3 firewall
+  addresses, 2 shapers, 2 policy packages (spoke + hub, with policies +
+  shaping-policies), 8 blueprints (spoke + hub × VM/30G/50G/120G), and 3
+  DVMDB device groups. Idempotent - safe to re-run. After running this, use
+  model-device-import-csv v1.2.1+ for Phase 2 per-site device imports.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: configure
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, adom, init, greenfield, mssp, bor, sase, onboarding, tenant]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files:
+    - content/adom-manifest.yaml
+    - content/platform-list.yaml
+    - content/tenant-defaults.example.yaml
+    - content/templates/bor-single/*.j2
+    - content/templates/bor-spa-single/*.j2
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, adom]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      description: Target ADOM name (created if not exists AND create_adom=true)
+    tenant_config:
+      type: string
+      description: >
+        Path to a YAML file with tenant-specific meta var overrides. Example
+        template shipped at content/tenant-defaults.example.yaml. Values here
+        replace the ADOM defaults from adom-manifest.yaml at meta var
+        create/update time.
+    create_adom:
+      type: boolean
+      default: false
+      description: >
+        If true and the ADOM doesn't exist, create it. Default false requires
+        the ADOM to pre-exist (safer default; ADOM creation may need FMG
+        privileges the SDK token doesn't have).
+    dry_run:
+      type: boolean
+      default: false
+      description: Print what would be done without calling FMG (planning mode)
+
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: object
+      properties:
+        ok:     {type: integer, description: Objects created or updated successfully}
+        failed: {type: integer, description: Objects that failed}
+        errors: {type: array, items: {type: string}}
+    adom:   {type: string}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read:
+      - "~/.config/mcp/fortimanager_credentials.yaml"
+      - "{tenant_config}"
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 300000

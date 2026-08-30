@@ -1,0 +1,37 @@
+config vpn ipsec phase1-interface
+    edit "SASE_Hub"
+        set type dynamic
+        set interface "{{ WAN_PORT }}"
+        set ike-version 2
+        set peertype any
+        set net-device disable
+        set mode-cfg enable
+        set add-route disable
+        set dpd on-idle
+        set dpd-retryinterval 60
+        set dhgrp 20 15 14
+        set network-overlay enable
+        set network-id {{ FABRIC_NETWORK_ID }}
+        set transport auto
+        set ipv4-start-ip {{ FABRIC_POOL_START }}
+        set ipv4-end-ip {{ FABRIC_POOL_END }}
+        set ipv4-netmask 255.255.255.0
+        set proposal {{ HUB_PROPOSAL }}
+        set psksecret {{ SEED_PSK }}
+    next
+end
+config vpn ipsec phase2-interface
+    edit "SASE_Hub"
+        set phase1name "SASE_Hub"
+        set proposal aes256-sha256 aes256gcm
+        set dhgrp 20 15 14
+        set keylifeseconds 86400
+    next
+end
+config system interface
+    edit "SASE_Hub"
+        set ip {{ FABRIC_HUB_IP }} 255.255.255.255
+        set remote-ip {{ FABRIC_HUB_REMOTE }} 255.255.255.0
+        set allowaccess ping
+    next
+end

@@ -1,0 +1,12 @@
+config firewall policy
+    purge
+end
+config system dhcp server
+    purge
+end
+config firewall address
+    delete "lan"
+end
+config system virtual-switch
+    purge
+end

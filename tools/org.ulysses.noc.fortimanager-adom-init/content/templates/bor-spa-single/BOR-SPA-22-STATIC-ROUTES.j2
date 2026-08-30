@@ -1,0 +1,30 @@
+config router static
+    edit 1
+{% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set distance 20
+        set device "{{ WAN_PORT }}"
+        set comment "Floating WAN default (fallback; primary via on-ramps)"
+    next
+    edit 20
+        set dstaddr "BOR_{{ POP1_NAME }}_PUBLIC"
+{% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set device "{{ WAN_PORT }}"
+        set comment "{{ POP1_NAME }} BOR PoP public via WAN"
+    next
+    edit 21
+        set dstaddr "BOR_{{ POP2_NAME }}_PUBLIC"
+{% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set device "{{ WAN_PORT }}"
+        set comment "{{ POP2_NAME }} BOR PoP public via WAN"
+    next
+    edit 10
+        set dst {{ BASTION_IP }} {{ BASTION_MASK }}
+{% if WAN_MODE == "dhcp" %}        set dynamic-gateway enable
+{% else %}        set gateway {{ WAN_GATEWAY }}
+{% endif %}        set device "{{ WAN_PORT }}"
+        set comment "Bastion / management return path (trusted host)"
+    next
+end

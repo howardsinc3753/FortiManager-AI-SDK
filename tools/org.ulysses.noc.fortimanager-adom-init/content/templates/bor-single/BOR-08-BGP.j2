@@ -1,0 +1,89 @@
+config router prefix-list
+    edit "PL_LAN_LOCAL"
+        config rule
+            edit 1
+                set prefix {{ LAN_SUBNET }} {{ LAN_MASK }}
+            next
+        end
+    next
+end
+config router route-map
+    edit "RM_OUT_{{ POP1_NAME | upper }}"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "{{ POP1_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ POP1_LOCAL_PREF }}
+            next
+            edit 99
+            next
+        end
+    next
+    edit "RM_OUT_{{ POP2_NAME | upper }}"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "{{ POP2_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ POP2_LOCAL_PREF }}
+            next
+            edit 99
+            next
+        end
+    next
+    edit "RM_OUT_FAIL"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "{{ FAIL_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ FAIL_LOCAL_PREF }}
+            next
+            edit 99
+            next
+        end
+    next
+end
+config router bgp
+    set as {{ BGP_AS }}
+    set router-id {{ ROUTER_ID }}
+    set keepalive-timer {{ BGP_KEEPALIVE }}
+    set holdtime-timer {{ BGP_HOLDTIME }}
+    set ibgp-multipath enable
+    set recursive-next-hop enable
+    set scan-time 5
+    set graceful-restart enable
+    config neighbor
+        edit "{{ POP1_BOR_NODE }}"
+            set interface "BOR_{{ POP1_NAME }}"
+            set update-source "BOR_{{ POP1_NAME }}"
+            set remote-as {{ BGP_AS }}
+            set advertisement-interval 1
+            set connect-timer 1
+            set capability-graceful-restart enable
+            set link-down-failover enable
+            set next-hop-self enable
+            set soft-reconfiguration enable
+            set route-map-out "RM_OUT_FAIL"
+            set route-map-out-preferable "RM_OUT_{{ POP1_NAME | upper }}"
+            set send-community both
+        next
+        edit "{{ POP2_BOR_NODE }}"
+            set interface "BOR_{{ POP2_NAME }}"
+            set update-source "BOR_{{ POP2_NAME }}"
+            set remote-as {{ BGP_AS }}
+            set advertisement-interval 1
+            set connect-timer 1
+            set capability-graceful-restart enable
+            set link-down-failover enable
+            set next-hop-self enable
+            set soft-reconfiguration enable
+            set route-map-out "RM_OUT_FAIL"
+            set route-map-out-preferable "RM_OUT_{{ POP2_NAME | upper }}"
+            set send-community both
+        next
+    end
+    config network
+        edit 1
+            set prefix {{ LAN_SUBNET }} {{ LAN_MASK }}
+        next
+    end
+end
