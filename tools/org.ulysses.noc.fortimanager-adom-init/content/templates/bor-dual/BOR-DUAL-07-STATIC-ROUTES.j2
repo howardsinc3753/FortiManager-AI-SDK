@@ -64,7 +64,6 @@ config router static
     edit 10
         set dst {{ BASTION_IP }} {{ BASTION_MASK }}
 {% if WAN_MODE == "dhcp" %}        set dynamic-gateway enable
-{% elif MGMT_GATEWAY %}        set gateway {{ MGMT_GATEWAY }}
 {% else %}        set gateway {{ WAN_GATEWAY }}
 {% endif %}        set device "{{ WAN_PORT }}"
         set comment "Bastion / management return path (via WAN1)"
@@ -72,7 +71,6 @@ config router static
     edit 11
         set dst {{ BASTION_IP }} {{ BASTION_MASK }}
 {% if WAN_MODE == "dhcp" %}        set dynamic-gateway enable
-{% elif MGMT_GATEWAY2 %}        set gateway {{ MGMT_GATEWAY2 }}
 {% else %}        set gateway {{ WAN2_GATEWAY }}
 {% endif %}        set device "{{ WAN2_PORT }}"
         set comment "Bastion / management return path (via WAN2)"
