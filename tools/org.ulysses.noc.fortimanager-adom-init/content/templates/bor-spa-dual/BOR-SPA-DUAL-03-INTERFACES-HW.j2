@@ -1,5 +1,7 @@
 config system interface
     edit "{{ WAN_PORT }}"
+        set vdom "root"
+        set type physical
         set alias "WAN1"
 {% if WAN_MODE == "static" %}        set ip {{ WAN_IP }} {{ WAN_MASK }}
 {% else %}        set mode dhcp
@@ -8,6 +10,8 @@ config system interface
         set role wan
     next
     edit "{{ WAN2_PORT }}"
+        set vdom "root"
+        set type physical
         set alias "WAN2"
 {% if WAN_MODE == "static" %}        set ip {{ WAN2_IP }} {{ WAN2_MASK }}
 {% else %}        set mode dhcp
@@ -16,6 +20,8 @@ config system interface
         set role wan
     next
     edit "{{ LAN_PORT }}"
+        set vdom "root"
+        set type physical
         set alias "LAN"
         set ip {{ LAN_IP }} {{ LAN_MASK }}
         set allowaccess ping https ssh
