@@ -51,7 +51,7 @@ config system sdwan
             end
         next
         edit "HC_Primary2"
-            set server "{{ POP1_PROBE }}"
+            set server "8.8.8.8"
             set failtime 2
             set recoverytime 3
             set update-static-route disable
@@ -81,7 +81,7 @@ config system sdwan
             end
         next
         edit "HC_Secondary2"
-            set server "{{ POP2_PROBE }}"
+            set server "8.8.4.4"
             set failtime 2
             set recoverytime 3
             set update-static-route disable
