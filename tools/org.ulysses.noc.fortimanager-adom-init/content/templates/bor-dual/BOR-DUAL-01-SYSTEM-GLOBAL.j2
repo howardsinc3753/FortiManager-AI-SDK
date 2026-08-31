@@ -1,0 +1,17 @@
+config system global
+    set hostname "{{ HOSTNAME }}"
+    set alias "{{ DEVICE_ALIAS }}"
+    set timezone "{{ TIMEZONE }}"
+    set admin-sport {{ ADMIN_SPORT }}
+    set admintimeout {{ ADMIN_TIMEOUT }}
+    set gui-auto-upgrade-setup-warning disable
+end
+config system admin
+    edit "admin"
+        set accprofile "super_admin"
+        set password "{{ ADMIN_PASSWORD }}"
+    next
+end
+config system fortiguard
+    set auto-firmware-upgrade disable
+end

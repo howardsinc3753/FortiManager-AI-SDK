@@ -1,0 +1,58 @@
+config router static
+    edit 1
+{% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set distance 20
+        set device "{{ WAN_PORT }}"
+        set comment "WAN1 floating default (fallback; SIA default via on-ramps)"
+    next
+    edit 2
+{% if WAN_MODE == "static" %}        set gateway {{ WAN2_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set distance 20
+        set device "{{ WAN2_PORT }}"
+        set comment "WAN2 floating default (fallback; SIA default via on-ramps)"
+    next
+    edit 20
+        set dstaddr "BOR_Primary1_PUBLIC"
+{% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set device "{{ WAN_PORT }}"
+        set comment "Primary1 BOR PoP public via WAN1"
+    next
+    edit 21
+        set dstaddr "BOR_Primary2_PUBLIC"
+{% if WAN_MODE == "static" %}        set gateway {{ WAN2_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set device "{{ WAN2_PORT }}"
+        set comment "Primary2 BOR PoP public via WAN2"
+    next
+    edit 22
+        set dstaddr "BOR_Secondary1_PUBLIC"
+{% if WAN_MODE == "static" %}        set gateway {{ WAN2_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set device "{{ WAN2_PORT }}"
+        set comment "Secondary1 BOR PoP public via WAN2"
+    next
+    edit 23
+        set dstaddr "BOR_Secondary2_PUBLIC"
+{% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
+{% else %}        set dynamic-gateway enable
+{% endif %}        set device "{{ WAN_PORT }}"
+        set comment "Secondary2 BOR PoP public via WAN1"
+    next
+    edit 10
+        set dst {{ BASTION_IP }} {{ BASTION_MASK }}
+{% if WAN_MODE == "dhcp" %}        set dynamic-gateway enable
+{% else %}        set gateway {{ WAN_GATEWAY }}
+{% endif %}        set device "{{ WAN_PORT }}"
+        set comment "Bastion / management return path (via WAN1)"
+    next
+    edit 11
+        set dst {{ BASTION_IP }} {{ BASTION_MASK }}
+{% if WAN_MODE == "dhcp" %}        set dynamic-gateway enable
+{% else %}        set gateway {{ WAN2_GATEWAY }}
+{% endif %}        set device "{{ WAN2_PORT }}"
+        set comment "Bastion / management return path (via WAN2)"
+    next
+end

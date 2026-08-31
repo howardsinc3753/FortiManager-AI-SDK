@@ -142,12 +142,14 @@ class AdomInitializer:
                 self._track(f"platform_mapping {name}/{plat}", _st(r))
 
     def stage_cli_templates(self):
-        # Read all .j2 files under content/templates/**
-        for subfolder in ("bor-single", "bor-spa-single"):
-            tpl_dir = CONTENT_DIR / "templates" / subfolder
-            if not tpl_dir.exists():
-                continue
-            for tpl_file in sorted(tpl_dir.glob("*.j2")):
+        # Auto-discover ALL subfolders under content/templates/** and push every
+        # .j2 file found. Lets partners add new role subfolders (e.g. bor-dual,
+        # bor-spa-dual, future bor-triple, etc.) without editing the orchestrator.
+        templates_root = CONTENT_DIR / "templates"
+        if not templates_root.exists():
+            return
+        for subfolder in sorted(p for p in templates_root.iterdir() if p.is_dir()):
+            for tpl_file in sorted(subfolder.glob("*.j2")):
                 name = tpl_file.stem
                 script = tpl_file.read_text(encoding="utf-8")
                 data = {
@@ -157,7 +159,7 @@ class AdomInitializer:
                     "description": f"BOR-SASE {name} - provisioned by adom-init tool",
                 }
                 r = self._call("set", f"/pm/config/adom/{self.adom}/obj/cli/template/{name}", data=data)
-                self._track(f"cli_template {name}", _st(r))
+                self._track(f"cli_template {subfolder.name}/{name}", _st(r))
 
     def stage_template_groups(self):
         for tg in self.manifest.get("template_groups", []):

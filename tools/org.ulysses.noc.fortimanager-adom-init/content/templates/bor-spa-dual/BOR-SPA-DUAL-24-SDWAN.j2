@@ -1,0 +1,82 @@
+config system sdwan
+    set status enable
+    config zone
+        edit "SDWAN_ZONE"
+        next
+        edit "Underlay_ZONE"
+        next
+    end
+    config members
+        edit 1
+            set interface "BOR_Primary1"
+            set zone "SDWAN_ZONE"
+        next
+        edit 2
+            set interface "BOR_Primary2"
+            set zone "SDWAN_ZONE"
+        next
+        edit 3
+            set interface "BOR_Secondary1"
+            set zone "SDWAN_ZONE"
+        next
+        edit 4
+            set interface "BOR_Secondary2"
+            set zone "SDWAN_ZONE"
+        next
+        edit 5
+            set interface "{{ WAN_PORT }}"
+            set zone "Underlay_ZONE"
+{% if WAN_MODE == "static" %}            set gateway {{ WAN_GATEWAY }}
+{% endif %}        next
+        edit 6
+            set interface "{{ WAN2_PORT }}"
+            set zone "Underlay_ZONE"
+{% if WAN_MODE == "static" %}            set gateway {{ WAN2_GATEWAY }}
+{% endif %}        next
+        edit 7
+            set interface "SASE_Hub"
+            set zone "SDWAN_ZONE"
+        next
+    end
+    config health-check
+        edit "SIA_Health"
+            set server "{{ POP1_PROBE }}" "{{ POP2_PROBE }}"
+            set failtime 2
+            set recoverytime 3
+            set update-static-route disable
+            set members 1 2 3 4
+            config sla
+                edit 1
+                    set link-cost-factor latency jitter packet-loss
+                    set latency-threshold {{ SLA_LATENCY_MS }}
+                    set jitter-threshold {{ SLA_JITTER_MS }}
+                    set packetloss-threshold {{ SLA_PKTLOSS_PCT }}
+                next
+            end
+        next
+    end
+end
+config system sdwan
+    config service
+        edit 1
+            set name "Private-Access"
+            set dst "RFC1918-10" "RFC1918-172" "RFC1918-192"
+            set priority-members 7
+            set tie-break fib-best-match
+        next
+        edit 2
+            set name "INET_via_BOR"
+            set mode priority
+            set dst "all"
+            set health-check "SIA_Health"
+            set link-cost-factor packet-loss
+            set tie-break cfg-order
+            set priority-members 1 2 3 4
+        next
+        edit 4
+            set name "Underlay_fallback"
+            set dst "all"
+            set priority-members 5 6
+        next
+    end
+end

@@ -170,6 +170,21 @@ meta_vars:
 - name: vm_interface_number
   default: '1'
   description: predefined variable for set fgtvm interface number
+- name: WAN2_PORT
+  default: port2
+  description: Circuit 2 WAN port
+- name: WAN2_IP
+  default: ''
+  description: Circuit 2 WAN IP (blank on DHCP)
+- name: WAN2_MASK
+  default: 255.255.255.0
+  description: Circuit 2 WAN mask
+- name: WAN2_GATEWAY
+  default: ''
+  description: Circuit 2 WAN gateway (blank on DHCP)
+- name: MGMT_GATEWAY2
+  default: ''
+  description: Circuit 2 bastion next-hop (must be on WAN2 subnet)
 normalized_interfaces:
 - name: LAN_ZONE
   description: LAN interface zone - resolves to LAN_ZONE on each device (CLI templates create the actual zone)
@@ -233,6 +248,52 @@ template_groups:
   - BOR-SPA-22-STATIC-ROUTES
   - BOR-SPA-23-BGP-RR
   - BOR-SPA-24-SDWAN
+- name: BOR-DUAL-STD-VM
+  description: BOR dual circuit spoke for VM
+  members:
+  - BOR-DUAL-01-SYSTEM-GLOBAL
+  - BOR-DUAL-03-INTERFACES-VM
+  - BOR-DUAL-04-ZONE-LAN
+  - BOR-DUAL-05-IPSEC-P1-P2
+  - BOR-DUAL-07-STATIC-ROUTES
+  - BOR-DUAL-08-BGP
+  - BOR-DUAL-09-SDWAN-BASE
+  - BOR-DUAL-11-SDWAN-RULES
+- name: BOR-DUAL-STD-HW
+  description: BOR dual circuit spoke for 30G 50G 120G HW
+  members:
+  - BOR-DUAL-01-SYSTEM-GLOBAL
+  - BOR-DUAL-03-INTERFACES-HW
+  - BOR-DUAL-04-ZONE-LAN
+  - BOR-DUAL-05-IPSEC-P1-P2
+  - BOR-DUAL-07-STATIC-ROUTES
+  - BOR-DUAL-08-BGP
+  - BOR-DUAL-09-SDWAN-BASE
+  - BOR-DUAL-11-SDWAN-RULES
+- name: BOR-SPA-DUAL-STD-VM
+  description: BOR SPA hub dual circuit for VM Extreme Fork
+  members:
+  - BOR-SPA-DUAL-01-SYSTEM-GLOBAL
+  - BOR-SPA-DUAL-03-INTERFACES-VM
+  - BOR-SPA-DUAL-04-ZONE-LAN
+  - BOR-SPA-DUAL-05-IPSEC-P1-P2
+  - BOR-SPA-DUAL-20-LOOPBACK
+  - BOR-SPA-DUAL-21-SASE-HUB-IPSEC
+  - BOR-SPA-DUAL-22-STATIC-ROUTES
+  - BOR-SPA-DUAL-23-BGP-RR
+  - BOR-SPA-DUAL-24-SDWAN
+- name: BOR-SPA-DUAL-STD-HW
+  description: BOR SPA hub dual circuit for 30G 50G 120G HW Extreme Fork
+  members:
+  - BOR-SPA-DUAL-01-SYSTEM-GLOBAL
+  - BOR-SPA-DUAL-03-INTERFACES-HW
+  - BOR-SPA-DUAL-04-ZONE-LAN
+  - BOR-SPA-DUAL-05-IPSEC-P1-P2
+  - BOR-SPA-DUAL-20-LOOPBACK
+  - BOR-SPA-DUAL-21-SASE-HUB-IPSEC
+  - BOR-SPA-DUAL-22-STATIC-ROUTES
+  - BOR-SPA-DUAL-23-BGP-RR
+  - BOR-SPA-DUAL-24-SDWAN
 policy_packages:
 - name: BOR-SINGLE-STD-PKG
   type: pkg
@@ -408,6 +469,170 @@ policy_packages:
     - BOR_UP_SHAPER
     traffic_shaper_reverse:
     - BOR_DOWN_SHAPER
+- name: BOR-DUAL-STD-PKG
+  type: pkg
+  policies:
+  - policyid: 1
+    name: LAN to BOR (SIA)
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    logtraffic: 2
+  - policyid: 2
+    name: BOR to LAN (return)
+    srcintf:
+    - SDWAN_ZONE
+    dstintf:
+    - LAN_ZONE
+    srcaddr:
+    - all
+    dstaddr:
+    - LOCAL-LAN
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    logtraffic: 2
+  - policyid: 3
+    name: LAN to Underlay (fallback)
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - Underlay_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 1
+    logtraffic: 2
+  shaping_policies:
+  - id: 1
+    name: BOR_OUTBOUND_SHAPER
+    service:
+    - ALL
+    srcaddr:
+    - all
+    dstaddr:
+    - all
+    dstintf:
+    - SDWAN_ZONE
+    traffic_shaper: BOR_UP_SHAPER
+    traffic_shaper_reverse: BOR_DOWN_SHAPER
+- name: BOR-SPA-DUAL-STD-PKG
+  type: pkg
+  policies:
+  - policyid: 1
+    name: SDWAN-Hairpin (spoke-to-spoke)
+    srcintf:
+    - SDWAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - all
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    logtraffic: 2
+  - policyid: 2
+    name: LAN to BOR Private no-SNAT
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - RFC1918-10
+    - RFC1918-172
+    - RFC1918-192
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    logtraffic: 2
+  - policyid: 3
+    name: LAN to BOR Internet SIA SNAT
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - SDWAN_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 1
+    logtraffic: 2
+  - policyid: 4
+    name: BOR to LAN return
+    srcintf:
+    - SDWAN_ZONE
+    dstintf:
+    - LAN_ZONE
+    srcaddr:
+    - all
+    dstaddr:
+    - LOCAL-LAN
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+  - policyid: 6
+    name: LAN to Underlay fallback
+    srcintf:
+    - LAN_ZONE
+    dstintf:
+    - Underlay_ZONE
+    srcaddr:
+    - LOCAL-LAN
+    dstaddr:
+    - all
+    action: 1
+    schedule:
+    - always
+    service:
+    - ALL
+    nat: 1
+    logtraffic: 2
+  shaping_policies:
+  - id: 1
+    name: BOR_OUTBOUND_SHAPER
+    service:
+    - ALL
+    srcaddr:
+    - all
+    dstaddr:
+    - all
+    dstintf:
+    - SDWAN_ZONE
+    traffic_shaper: BOR_UP_SHAPER
+    traffic_shaper_reverse: BOR_DOWN_SHAPER
 firewall_addresses:
 - name: BOR_Primary_PUBLIC
   type: 2
@@ -429,6 +654,22 @@ firewall_addresses:
   - $(LAN_SUBNET)
   - $(LAN_MASK)
   allow_routing: 0
+- name: BOR_Primary1_PUBLIC
+  type: 2
+  fqdn: $(POP1_FQDN)
+  allow_routing: 1
+- name: BOR_Primary2_PUBLIC
+  type: 2
+  fqdn: $(POP1_FQDN)
+  allow_routing: 1
+- name: BOR_Secondary1_PUBLIC
+  type: 2
+  fqdn: $(POP2_FQDN)
+  allow_routing: 1
+- name: BOR_Secondary2_PUBLIC
+  type: 2
+  fqdn: $(POP2_FQDN)
+  allow_routing: 1
 shapers:
 - name: BOR_DOWN_SHAPER
   guaranteed_bandwidth: 0
@@ -527,6 +768,94 @@ blueprints:
   port_provisioning: 1
   linked_to_model: 1
   enforce_device_config: 0
+- name: BOR-DUAL-STD-VM
+  platform: FortiGate-VM64-KVM
+  prov_type: 1
+  cliprofs:
+  - BOR-DUAL-STD-VM
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-VM
+  pkg: BOR-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-DUAL-STD-VM
+  platform: FortiGate-VM64-KVM
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-DUAL-STD-VM
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-VM
+  pkg: BOR-SPA-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-DUAL-STD-30G
+  platform: FortiGate-30G
+  prov_type: 1
+  cliprofs:
+  - BOR-DUAL-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-DUAL-STD-30G
+  platform: FortiGate-30G
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-DUAL-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-SPA-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-DUAL-STD-50G
+  platform: FortiGate-50G
+  prov_type: 1
+  cliprofs:
+  - BOR-DUAL-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-DUAL-STD-50G
+  platform: FortiGate-50G
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-DUAL-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-HW-SMALL
+  pkg: BOR-SPA-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-DUAL-STD-120G
+  platform: FortiGate-120G
+  prov_type: 1
+  cliprofs:
+  - BOR-DUAL-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-120G
+  pkg: BOR-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
+- name: BOR-SPA-DUAL-STD-120G
+  platform: FortiGate-120G
+  prov_type: 1
+  cliprofs:
+  - BOR-SPA-DUAL-STD-HW
+  prerun_cliprof:
+  - BOR-02-GREENFIELD-120G
+  pkg: BOR-SPA-DUAL-STD-PKG
+  port_provisioning: 1
+  linked_to_model: 1
+  enforce_device_config: 0
 device_groups:
 - name: BOR_Branch_Dual
   description: Dual-BOR branches (two WAN circuits + two SASE tunnels per site)
@@ -543,3 +872,5 @@ device_groups:
 template_paths:
   bor_single_dir: templates/bor-single
   bor_spa_single_dir: templates/bor-spa-single
+  bor_dual_dir: templates/bor-dual
+  bor_spa_dual_dir: templates/bor-spa-dual

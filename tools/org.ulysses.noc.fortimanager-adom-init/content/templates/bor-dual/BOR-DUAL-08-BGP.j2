@@ -1,0 +1,139 @@
+config router prefix-list
+    edit "PL_LAN_LOCAL"
+        config rule
+            edit 1
+                set prefix {{ LAN_SUBNET }} {{ LAN_MASK }}
+            next
+        end
+    next
+end
+config router route-map
+    edit "RM_OUT_PRIMARY1"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "65001:10" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference 200
+            next
+            edit 99
+            next
+        end
+    next
+    edit "RM_OUT_PRIMARY2"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "65001:20" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference 195
+            next
+            edit 99
+            next
+        end
+    next
+    edit "RM_OUT_SECONDARY1"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "65001:30" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference 190
+            next
+            edit 99
+            next
+        end
+    next
+    edit "RM_OUT_SECONDARY2"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "65001:40" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference 185
+            next
+            edit 99
+            next
+        end
+    next
+    edit "RM_OUT_FAIL"
+        config rule
+            edit 1
+                set match-ip-address "PL_LAN_LOCAL"
+                set set-community "{{ FAIL_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ FAIL_LOCAL_PREF }}
+            next
+            edit 99
+            next
+        end
+    next
+end
+config router bgp
+    set as {{ BGP_AS }}
+    set router-id {{ ROUTER_ID }}
+    set keepalive-timer {{ BGP_KEEPALIVE }}
+    set holdtime-timer {{ BGP_HOLDTIME }}
+    set ibgp-multipath enable
+    set recursive-next-hop enable
+    set scan-time 5
+    set graceful-restart enable
+    config neighbor
+        edit "172.16.0.1"
+            set interface "BOR_Primary1"
+            set update-source "BOR_Primary1"
+            set remote-as {{ BGP_AS }}
+            set advertisement-interval 1
+            set connect-timer 1
+            set capability-graceful-restart enable
+            set link-down-failover enable
+            set next-hop-self enable
+            set soft-reconfiguration enable
+            set route-map-out "RM_OUT_FAIL"
+            set route-map-out-preferable "RM_OUT_PRIMARY1"
+            set send-community both
+        next
+        edit "172.16.16.1"
+            set interface "BOR_Primary2"
+            set update-source "BOR_Primary2"
+            set remote-as {{ BGP_AS }}
+            set advertisement-interval 1
+            set connect-timer 1
+            set capability-graceful-restart enable
+            set link-down-failover enable
+            set next-hop-self enable
+            set soft-reconfiguration enable
+            set route-map-out "RM_OUT_FAIL"
+            set route-map-out-preferable "RM_OUT_PRIMARY2"
+            set send-community both
+        next
+        edit "172.16.8.1"
+            set interface "BOR_Secondary1"
+            set update-source "BOR_Secondary1"
+            set remote-as {{ BGP_AS }}
+            set advertisement-interval 1
+            set connect-timer 1
+            set capability-graceful-restart enable
+            set link-down-failover enable
+            set next-hop-self enable
+            set soft-reconfiguration enable
+            set route-map-out "RM_OUT_FAIL"
+            set route-map-out-preferable "RM_OUT_SECONDARY1"
+            set send-community both
+        next
+        edit "172.16.24.1"
+            set interface "BOR_Secondary2"
+            set update-source "BOR_Secondary2"
+            set remote-as {{ BGP_AS }}
+            set advertisement-interval 1
+            set connect-timer 1
+            set capability-graceful-restart enable
+            set link-down-failover enable
+            set next-hop-self enable
+            set soft-reconfiguration enable
+            set route-map-out "RM_OUT_FAIL"
+            set route-map-out-preferable "RM_OUT_SECONDARY2"
+            set send-community both
+        next
+    end
+    config network
+        edit 1
+            set prefix {{ LAN_SUBNET }} {{ LAN_MASK }}
+        next
+    end
+end

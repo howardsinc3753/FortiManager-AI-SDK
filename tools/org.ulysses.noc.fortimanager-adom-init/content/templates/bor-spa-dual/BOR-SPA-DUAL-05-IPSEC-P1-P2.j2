@@ -1,0 +1,92 @@
+config vpn ipsec phase1-interface
+    edit "BOR_Primary1"
+        set type ddns
+        set interface "{{ WAN_PORT }}"
+        set ike-version 2
+        set peertype any
+        set net-device disable
+        set mode-cfg enable
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+        set network-overlay enable
+        set network-id 0
+        set transport auto
+        set fortinet-esp enable
+        set dpd on-idle
+        set remotegw-ddns "{{ POP1_FQDN }}"
+        set psksecret {{ SEED_PSK }}
+    next
+    edit "BOR_Primary2"
+        set type ddns
+        set interface "{{ WAN2_PORT }}"
+        set ike-version 2
+        set peertype any
+        set net-device disable
+        set mode-cfg enable
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+        set network-overlay enable
+        set network-id 1
+        set transport auto
+        set fortinet-esp enable
+        set dpd on-idle
+        set remotegw-ddns "{{ POP1_FQDN }}"
+        set psksecret {{ SEED_PSK }}
+    next
+    edit "BOR_Secondary1"
+        set type ddns
+        set interface "{{ WAN2_PORT }}"
+        set ike-version 2
+        set peertype any
+        set net-device disable
+        set mode-cfg enable
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+        set network-overlay enable
+        set network-id 0
+        set transport auto
+        set fortinet-esp enable
+        set dpd on-idle
+        set remotegw-ddns "{{ POP2_FQDN }}"
+        set psksecret {{ SEED_PSK }}
+    next
+    edit "BOR_Secondary2"
+        set type ddns
+        set interface "{{ WAN_PORT }}"
+        set ike-version 2
+        set peertype any
+        set net-device disable
+        set mode-cfg enable
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+        set network-overlay enable
+        set network-id 1
+        set transport auto
+        set fortinet-esp enable
+        set dpd on-idle
+        set remotegw-ddns "{{ POP2_FQDN }}"
+        set psksecret {{ SEED_PSK }}
+    next
+end
+config vpn ipsec phase2-interface
+    edit "BOR_Primary1"
+        set phase1name "BOR_Primary1"
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+    next
+    edit "BOR_Primary2"
+        set phase1name "BOR_Primary2"
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+    next
+    edit "BOR_Secondary1"
+        set phase1name "BOR_Secondary1"
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+    next
+    edit "BOR_Secondary2"
+        set phase1name "BOR_Secondary2"
+        set proposal {{ ONRAMP_PROPOSAL }}
+        set dhgrp {{ ONRAMP_DHGRP }}
+    next
+end

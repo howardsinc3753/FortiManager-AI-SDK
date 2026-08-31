@@ -1,0 +1,168 @@
+{% set _fabric_net = FABRIC_OVERLAY.split('/')[0] %}config router community-list
+    edit "CL_ONRAMP_1"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:10"
+            next
+        end
+    next
+    edit "CL_ONRAMP_2"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:20"
+            next
+        end
+    next
+    edit "CL_ONRAMP_3"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:30"
+            next
+        end
+    next
+    edit "CL_ONRAMP_4"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:40"
+            next
+        end
+    next
+    edit "CL_ONRAMP_5"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:50"
+            next
+        end
+    next
+    edit "CL_ONRAMP_6"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:60"
+            next
+        end
+    next
+    edit "CL_ONRAMP_7"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:70"
+            next
+        end
+    next
+    edit "CL_ONRAMP_8"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:80"
+            next
+        end
+    next
+    edit "CL_ONRAMP_FAIL"
+        config rule
+            edit 1
+                set action permit
+                set match "65001:64911"
+            next
+        end
+    next
+end
+config router route-map
+    edit "RM_FABRIC_IN"
+        config rule
+            edit 101
+                set match-community "CL_ONRAMP_1"
+                set set-local-preference 200
+                set set-priority 100
+            next
+            edit 102
+                set match-community "CL_ONRAMP_2"
+                set set-local-preference 195
+                set set-priority 105
+            next
+            edit 103
+                set match-community "CL_ONRAMP_3"
+                set set-local-preference 190
+                set set-priority 110
+            next
+            edit 104
+                set match-community "CL_ONRAMP_4"
+                set set-local-preference 185
+                set set-priority 115
+            next
+            edit 105
+                set match-community "CL_ONRAMP_5"
+                set set-local-preference 180
+                set set-priority 120
+            next
+            edit 106
+                set match-community "CL_ONRAMP_6"
+                set set-local-preference 175
+                set set-priority 125
+            next
+            edit 107
+                set match-community "CL_ONRAMP_7"
+                set set-local-preference 170
+                set set-priority 130
+            next
+            edit 108
+                set match-community "CL_ONRAMP_8"
+                set set-local-preference 165
+                set set-priority 135
+            next
+            edit 190
+                set match-community "CL_ONRAMP_FAIL"
+                set set-local-preference 50
+                set set-priority 300
+            next
+            edit 999
+            next
+        end
+    next
+end
+config router bgp
+    set as {{ BGP_AS }}
+    set router-id {{ ROUTER_ID }}
+    set keepalive-timer {{ BGP_KEEPALIVE }}
+    set holdtime-timer {{ BGP_HOLDTIME }}
+    set ibgp-multipath enable
+    set additional-path enable
+    set additional-path-select 4
+    set graceful-restart enable
+    config neighbor-group
+        edit "SASE_Hub"
+            set interface "SASE_Hub"
+            set remote-as {{ BGP_AS }}
+            set route-reflector-client enable
+            set route-map-in "RM_FABRIC_IN"
+            set next-hop-self enable
+            set additional-path send
+            set adv-additional-path 4
+            set capability-graceful-restart enable
+            set link-down-failover enable
+            set soft-reconfiguration enable
+        next
+    end
+    config neighbor-range
+        edit 1
+            set prefix {{ _fabric_net }} 255.255.255.0
+            set neighbor-group "SASE_Hub"
+        next
+    end
+    config network
+        edit 1
+            set prefix {{ _fabric_net }} 255.255.255.0
+        next
+        edit 2
+            set prefix {{ LAN_SUBNET }} {{ LAN_MASK }}
+        next
+{% if HUB_LOOPBACK %}        edit 3
+            set prefix {{ HUB_LOOPBACK }} 255.255.255.255
+        next
+{% endif %}    end
+end
