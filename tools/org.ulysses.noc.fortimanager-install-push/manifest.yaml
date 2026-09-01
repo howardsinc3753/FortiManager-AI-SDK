@@ -1,0 +1,116 @@
+---
+canonical_id: org.ulysses.noc.fortimanager-install-push/1.0.0
+name: FortiManager Install Push
+version: 1.0.0
+description: >
+  Fire install for a device (equivalent to GUI Install Wizard). Wraps
+  exec /securityconsole/install/device with flags: ["none"] for real push
+  or flags: ["preview"] for validation-only. Task-based - polls to terminal
+  state and returns structured result with per-device install log lines
+  (name, vdom, ip, state, percent, detail, err). This is Phase 3 of the
+  BOR-SASE deployment workflow (Phase 1 is greenfield-adom-init, Phase 2
+  is model-device-import-csv). Preview mode verified against spoke-1 live.
+status: draft
+
+metadata:
+  org_namespace: ulysses
+  domain: noc
+  intent: execute
+  vendor: fortinet
+  shelf: noc/fortimanager
+  tags: [fortimanager, fmg, install, push, deploy, sase, bor, mssp]
+
+runtime:
+  language: python
+  entry_point: main
+  python_packages: [pyyaml]
+  dotnet_packages: []
+  files: []
+  services: []
+
+parameters:
+  type: object
+  required: [fmg_host, adom, device]
+  properties:
+    fmg_host:
+      type: string
+      description: FortiManager hostname or IP
+    adom:
+      type: string
+      description: Target ADOM containing the device
+    device:
+      type: string
+      description: Device name (DVMDB) to install
+    vdom:
+      type: string
+      default: root
+      description: Target vdom on the device
+    preview_only:
+      type: boolean
+      default: false
+      description: >
+        If true, use flags: ["preview"] - FMG validates the config and
+        generates a device rev but does NOT commit to the device. Safe
+        for CI validation or partner dry-runs.
+    poll_interval_sec:
+      type: number
+      default: 3
+      description: Seconds between task-state polls
+    max_wait_sec:
+      type: integer
+      default: 300
+      description: Max seconds to wait for task to reach terminal state
+    dev_rev_comments:
+      type: string
+      description: >
+        Optional comment on the generated device rev. Defaults to an
+        auto-generated string identifying the tool + mode.
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    action:
+      type: string
+      enum: [preview-passed, preview-passed-with-warnings, preview-failed,
+             installed, installed-with-warnings, install-failed, timeout]
+    adom: {type: string}
+    device: {type: string}
+    vdom: {type: string}
+    task_id: {type: integer}
+    state: {type: string, enum: [pending, running, done, error, warning, cancelled, aborted, timeout]}
+    num_err: {type: integer}
+    num_done: {type: integer}
+    percent: {type: integer}
+    waited_sec: {type: number}
+    timed_out: {type: boolean}
+    lines:
+      type: array
+      description: Per-device install log lines from FMG task detail
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          vdom: {type: string}
+          ip: {type: string}
+          state: {type: string}
+          percent: {type: integer}
+          detail: {type: string}
+          err: {type: integer}
+    error: {type: string, description: Present only on failure}
+
+credentials:
+  - name: fortimanager
+    type: username_password
+
+capabilities:
+  network:
+    outbound: [{host: "{fmg_host}", port: 443, protocol: https}]
+    inbound: []
+  filesystem:
+    read: ["~/.config/mcp/fortimanager_credentials.yaml"]
+    write: []
+  process:
+    spawn: false
+    elevated: false
+  max_execution_time_ms: 600000
