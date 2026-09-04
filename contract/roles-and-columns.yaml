@@ -1,0 +1,354 @@
+# =============================================================================
+# BOR Role & Column Contract  —  cross-repo source of truth
+# =============================================================================
+# schema_version: 1
+# last_updated: 2026-09-04
+# status: v1 FROZEN — App + SDK reconciled against real code + templates 2026-09-04
+#
+# PURPOSE
+#   The FortiSASE App and the FortiManager-AI-SDK describe the SAME four BOR
+#   roles from two different angles. They do NOT mirror — they TRANSLATE:
+#     * App models a deployment as {role, dual_wan, is_vm} (orthogonal axes)
+#     * FMG SDK flattens that to a single template_group / blueprint / pkg name
+#   This file is the machine-checkable contract that keeps the translation intact.
+#   Break it and installs fail (Jinja undefined var, missing blueprint, CSV/meta
+#   name mismatch).
+#
+# OWNERSHIP  (see BOR-Role-Registry/CONTRACT.md)
+#   OWNED BY : FortiSASE App Claude (this repo).
+#   CONSUMED : FMG SDK vendors a BYTE-IDENTICAL copy into
+#              FortiManager-AI-SDK/contract/roles-and-columns.yaml
+#   NOT a runtime import — each repo carries its own copy so both ship stand-alone
+#   (the SDK is distributed Apache-2.0 to partners on its own).
+#
+# ENFORCEMENT  (validators, both sides, fail-loud)
+#   App  : validate_contract.py — asserts generator.py CSV export == csv_columns
+#          here.  Runs at CSV-export time + in CI.
+#   SDK  : asserts adom-manifest.yaml meta-vars/blueprints/groups == this file
+#          (via the role_map).  Runs at `adom-init --create-adom` + in CI.
+#
+# DECISIONS (settled 2026-09-04, App<->SDK)
+#   * platform-list.yaml stays SDK-owned; this contract carries only the short
+#     platform alias per role (VM/30G/50G/120G). (open-Q #1, option b)
+#   * Adding role #5 uses Daniel's role-spec-<name>.yaml work order: spec = human
+#     intent -> both build -> contract updated -> both validators pass -> ship.
+#   * Meta-var + CSV-column NAMES are identical across repos. Only the role
+#     taxonomy (role/template_group/blueprint/device_group) is mapped, below.
+# =============================================================================
+
+naming:
+  policy_packages:
+    spoke: BOR-SPOKE-STD-PKG      # bor-single + bor-dual  (SPOKE zone shape)
+    hub:   BOR-SPA-HUB-STD-PKG    # bor-spa-single + bor-spa-dual  (HUB zone shape)
+  device_groups:
+    single: BOR_Branch_Single     # bor-single
+    dual:   BOR_Branch_Dual       # bor-dual
+    hub:    BOR_Branch_SPA_Hub    # BOTH bor-spa-single AND bor-spa-dual
+  normalized_interfaces:          # created per-ADOM; referenced by all policies
+    - {name: LAN_ZONE,      zone_type: system}
+    - {name: SDWAN_ZONE,    zone_type: sdwan}
+    - {name: Underlay_ZONE, zone_type: sdwan}
+  platforms_standard: [VM, 30G, 50G, 120G]   # the 4 that have FMG blueprints
+
+# -----------------------------------------------------------------------------
+# META-VARIABLE CATALOG  —  all 61, classified once.
+#   scope:
+#     per_device  = App emits it as a CSV column (one value per device)
+#     tenant      = ADOM default set by adom-init tenant-defaults; App leaves the
+#                   CSV cell BLANK (or has no column) so the ADOM default applies
+#     sdk_internal= SDK-side plumbing; never a CSV column
+#   applies_to: all | dual | spa   (dual = dual_wan roles; spa = bor-spa roles)
+#   csv: the CSV column name when scope=per_device or a tenant-optional column
+#        (identical to the meta-var name); omitted when there is no column.
+#   static_only: value only required/emitted when WAN_MODE == static
+# -----------------------------------------------------------------------------
+meta_vars:
+
+  # --- identity ---
+  HOSTNAME:            {scope: per_device, applies_to: all, csv: HOSTNAME}
+  SITE_ID:             {scope: per_device, applies_to: all, csv: SITE_ID}
+  ROUTER_ID:           {scope: per_device, applies_to: all, csv: ROUTER_ID}
+  DEVICE_ALIAS:        {scope: tenant,     applies_to: all, csv: DEVICE_ALIAS}   # tenant-optional
+  TIMEZONE:            {scope: tenant,     applies_to: all, csv: TIMEZONE}       # tenant-optional
+
+  # --- creds ---
+  ADMIN_PASSWORD:      {scope: per_device, applies_to: all, csv: ADMIN_PASSWORD}
+  ADMIN_SPORT:         {scope: tenant,     applies_to: all, csv: ADMIN_SPORT}    # tenant-optional
+  ADMIN_TIMEOUT:       {scope: tenant,     applies_to: all, csv: ADMIN_TIMEOUT}  # tenant-optional
+  SEED_PSK:            {scope: tenant,     applies_to: all, secret: true}        # never in CSV; BOR + fabric tunnel PSK
+
+  # --- lan ---
+  LAN_IP:              {scope: per_device, applies_to: all, csv: LAN_IP}
+  LAN_MASK:            {scope: per_device, applies_to: all, csv: LAN_MASK}
+  LAN_PORT:            {scope: per_device, applies_to: all, csv: LAN_PORT}
+  LAN_SUBNET:          {scope: per_device, applies_to: all, csv: LAN_SUBNET}
+
+  # --- bastion (mgmt) ---
+  BASTION_IP:          {scope: tenant,     applies_to: all}   # ADOM default; not an App CSV column
+  BASTION_MASK:        {scope: tenant,     applies_to: all}
+
+  # --- wan1 ---
+  WAN_PORT:            {scope: per_device, applies_to: all, csv: WAN_PORT}
+  WAN_MODE:            {scope: per_device, applies_to: all, csv: WAN_MODE}       # static|dhcp; SHARED across both circuits
+  WAN_IP:              {scope: per_device, applies_to: all, csv: WAN_IP,      static_only: true}
+  WAN_MASK:            {scope: per_device, applies_to: all, csv: WAN_MASK,    static_only: true}
+  WAN_GATEWAY:         {scope: per_device, applies_to: all, csv: WAN_GATEWAY, static_only: true}
+  WAN_DHCP_DIST:       {scope: per_device, applies_to: all, csv: WAN_DHCP_DIST}  # AD/distance when WAN_MODE=dhcp
+
+  # --- legacy (retained for CSV back-compat; always blank per gotcha #19; drop in v2) ---
+  MGMT_GATEWAY:        {scope: per_device, applies_to: all,  csv: MGMT_GATEWAY,  legacy: true}
+  MGMT_GATEWAY2:       {scope: per_device, applies_to: dual, csv: MGMT_GATEWAY2, legacy: true}
+
+  # --- pop / sase ---
+  POP1_FQDN:           {scope: per_device, applies_to: all, csv: POP1_FQDN}
+  POP2_FQDN:           {scope: per_device, applies_to: all, csv: POP2_FQDN}
+  POP1_PROBE:          {scope: per_device, applies_to: all, csv: POP1_PROBE}   # default 8.8.8.8 if blank
+  POP2_PROBE:          {scope: per_device, applies_to: all, csv: POP2_PROBE}   # default 8.8.4.4 if blank
+  POP1_NAME:           {scope: tenant,     applies_to: all}
+  POP2_NAME:           {scope: tenant,     applies_to: all}
+  POP1_BOR_NODE:       {scope: tenant,     applies_to: all}
+  POP2_BOR_NODE:       {scope: tenant,     applies_to: all}
+
+  # --- bgp ---
+  BGP_AS:              {scope: tenant, applies_to: all, csv: BGP_AS}          # tenant-optional
+  BGP_KEEPALIVE:       {scope: tenant, applies_to: all, csv: BGP_KEEPALIVE}   # tenant-optional
+  BGP_HOLDTIME:        {scope: tenant, applies_to: all, csv: BGP_HOLDTIME}    # tenant-optional
+
+  # --- bgp policy (route-maps / communities / local-pref) ---
+  FAIL_COMMUNITY:      {scope: tenant, applies_to: all}
+  FAIL_LOCAL_PREF:     {scope: tenant, applies_to: all}
+  POP1_COMMUNITY:      {scope: tenant, applies_to: all}
+  POP1_LOCAL_PREF:     {scope: tenant, applies_to: all}
+  POP2_COMMUNITY:      {scope: tenant, applies_to: all}
+  POP2_LOCAL_PREF:     {scope: tenant, applies_to: all}
+
+  # --- sla ---
+  SLA_LATENCY_MS:      {scope: tenant, applies_to: all, csv: SLA_LATENCY_MS}   # tenant-optional
+  SLA_JITTER_MS:       {scope: tenant, applies_to: all, csv: SLA_JITTER_MS}    # tenant-optional
+  SLA_PKTLOSS_PCT:     {scope: tenant, applies_to: all, csv: SLA_PKTLOSS_PCT}  # tenant-optional
+
+  # --- bandwidth ---
+  SITE_BW_MBPS:        {scope: tenant, applies_to: all, csv: SITE_BW_MBPS}       # tenant-optional
+  SITE_BW_DOWN_MBPS:   {scope: tenant, applies_to: all, csv: SITE_BW_DOWN_MBPS}  # tenant-optional
+
+  # --- wan2 (dual-circuit only; NOTE: no WAN2_MODE — WAN_MODE is shared) ---
+  WAN2_PORT:           {scope: per_device, applies_to: dual, csv: WAN2_PORT}
+  WAN2_IP:             {scope: per_device, applies_to: dual, csv: WAN2_IP,      static_only: true}
+  WAN2_MASK:           {scope: per_device, applies_to: dual, csv: WAN2_MASK,    static_only: true}
+  WAN2_GATEWAY:        {scope: per_device, applies_to: dual, csv: WAN2_GATEWAY, static_only: true}
+
+  # --- spa fabric hub (bor-spa only) ---
+  HUB_LOOPBACK:        {scope: per_device, applies_to: spa, csv: HUB_LOOPBACK}       # optional — blank omits loopback
+  FABRIC_OVERLAY:      {scope: per_device, applies_to: spa, csv: FABRIC_OVERLAY}     # required (e.g. 10.10.7.0/24)
+  FABRIC_HUB_IP:       {scope: per_device, applies_to: spa, csv: FABRIC_HUB_IP,     derived: host(overlay,253)}
+  FABRIC_HUB_REMOTE:   {scope: per_device, applies_to: spa, csv: FABRIC_HUB_REMOTE, derived: host(overlay,254)}
+  FABRIC_POOL_START:   {scope: per_device, applies_to: spa, csv: FABRIC_POOL_START, derived: host(overlay,1)}
+  FABRIC_POOL_END:     {scope: per_device, applies_to: spa, csv: FABRIC_POOL_END,   derived: host(overlay,252)}
+  FABRIC_NETWORK_ID:   {scope: tenant,     applies_to: spa, csv: FABRIC_NETWORK_ID}  # tenant-optional
+  HUB_PROPOSAL:        {scope: tenant,     applies_to: spa, csv: HUB_PROPOSAL}        # tenant-optional
+  ONRAMP_DHGRP:        {scope: tenant,     applies_to: spa}   # ADOM default; not an App CSV column
+  ONRAMP_NETWORK_ID:   {scope: tenant,     applies_to: spa}
+  ONRAMP_PROPOSAL:     {scope: tenant,     applies_to: spa}
+
+  # --- platform aid ---
+  vm_interface_number: {scope: sdk_internal, applies_to: all}   # SDK maps normalized ports per platform
+
+# -----------------------------------------------------------------------------
+# ROLE MAP  —  App {role, dual_wan} (+ is_vm for template_group) -> FMG artifacts
+#   meta_var counts (derived from catalog): single 45 / dual 50 / spa-single 56 /
+#   spa-dual 61.   CSV column counts: single 34 / dual 39 / spa-single 42 /
+#   spa-dual 47.   (61 = full union = bor-spa-dual.)
+#
+# COLUMN COMPOSITION (read carefully — both validators depend on it):
+#   full csv set = roles[bor-single].csv_columns  +  this role's csv_columns_added
+#   csv_columns_added is ALWAYS relative to the 34-col bor-single base, NEVER to the
+#   `mirrors` parent. The two optional blocks are INDEPENDENT additive flags applied
+#   in this fixed order: WAN2 block (if dual_wan) THEN SPA block (if role==bor-spa) —
+#   matching generator.fmg_headers_for(). `mirrors:` is human lineage only; it does
+#   NOT drive column or meta composition.
+# -----------------------------------------------------------------------------
+roles:
+
+  - id: bor-single
+    name: BOR Single-Circuit Spoke
+    app_key: {role: bor,     dual_wan: false}
+    fmg:
+      template_folder: bor-single
+      template_group:  {vm: BOR-SINGLE-STD,      hw: BOR-SINGLE-STD-HW}   # VM group has no -VM suffix (verbatim; live ADOMs depend on it — normalize in v2)
+      blueprint_prefix: BOR-SINGLE-STD           # -> BOR-SINGLE-STD-{VM,30G,50G,120G}
+      device_group:    BOR_Branch_Single
+      policy_package:  BOR-SPOKE-STD-PKG
+    app:
+      offline_template: templates/bor.conf.j2
+      ui_role_id: "BOR (single-circuit spoke)"
+      csv_export_folder: fmg-export/hardware-blueprints
+    platforms: [VM, 30G, 50G, 120G]
+    csv_columns:   # EXACT order generator.FMG_CSV_HEADERS emits (34)
+      - Serial Number
+      - Device Blueprint
+      - Name
+      - HOSTNAME
+      - SITE_ID
+      - ADMIN_PASSWORD
+      - WAN_PORT
+      - LAN_PORT
+      - WAN_MODE
+      - WAN_IP
+      - WAN_MASK
+      - WAN_GATEWAY
+      - WAN_DHCP_DIST
+      - MGMT_GATEWAY
+      - LAN_IP
+      - LAN_MASK
+      - LAN_SUBNET
+      - ROUTER_ID
+      - TIMEZONE
+      - ADMIN_SPORT
+      - ADMIN_TIMEOUT
+      - DEVICE_ALIAS
+      - BGP_AS
+      - BGP_KEEPALIVE
+      - BGP_HOLDTIME
+      - SLA_LATENCY_MS
+      - SLA_JITTER_MS
+      - SLA_PKTLOSS_PCT
+      - SITE_BW_MBPS
+      - SITE_BW_DOWN_MBPS
+      - POP1_FQDN
+      - POP2_FQDN
+      - POP1_PROBE
+      - POP2_PROBE
+
+  - id: bor-dual
+    name: BOR Dual-Circuit Spoke
+    mirrors: bor-single
+    app_key: {role: bor,     dual_wan: true}
+    fmg:
+      template_folder: bor-dual
+      template_group:  {vm: BOR-DUAL-STD-VM,     hw: BOR-DUAL-STD-HW}
+      blueprint_prefix: BOR-DUAL-STD
+      device_group:    BOR_Branch_Dual
+      policy_package:  BOR-SPOKE-STD-PKG         # same as single — zones identical
+    app:
+      offline_template: templates/bor-dual.conf.j2
+      ui_role_id: "BOR (dual-circuit spoke)"
+      csv_export_folder: fmg-export/hardware-blueprints/DUAL
+    platforms: [VM, 30G, 50G, 120G]
+    csv_columns_added:   # appended after POP2_PROBE (5) -> 39 total
+      - WAN2_PORT
+      - WAN2_IP
+      - WAN2_MASK
+      - WAN2_GATEWAY
+      - MGMT_GATEWAY2
+
+  - id: bor-spa-single
+    name: BOR + SPA Hub (single-circuit)
+    mirrors: bor-single
+    app_key: {role: bor-spa, dual_wan: false}
+    fmg:
+      template_folder: bor-spa-single
+      template_group:  {vm: BOR-SPA-SINGLE-STD-VM, hw: BOR-SPA-SINGLE-STD-HW}
+      blueprint_prefix: BOR-SPA-SINGLE-STD
+      device_group:    BOR_Branch_SPA_Hub
+      policy_package:  BOR-SPA-HUB-STD-PKG       # HUB pkg
+    app:
+      offline_template: templates/bor-spa.conf.j2
+      ui_role_id: "BOR + SPA Hub (single)"
+      csv_export_folder: fmg-export/hardware-blueprints/SPA-Hub
+    platforms: [VM, 30G, 50G, 120G]
+    csv_columns_added:   # appended after POP2_PROBE (8) -> 42 total
+      - HUB_LOOPBACK
+      - FABRIC_OVERLAY
+      - FABRIC_HUB_IP
+      - FABRIC_HUB_REMOTE
+      - FABRIC_POOL_START
+      - FABRIC_POOL_END
+      - FABRIC_NETWORK_ID
+      - HUB_PROPOSAL
+
+  - id: bor-spa-dual
+    name: BOR + SPA Hub (dual-circuit)
+    mirrors: bor-spa-single
+    app_key: {role: bor-spa, dual_wan: true}
+    fmg:
+      template_folder: bor-spa-dual
+      template_group:  {vm: BOR-SPA-DUAL-STD-VM, hw: BOR-SPA-DUAL-STD-HW}
+      blueprint_prefix: BOR-SPA-DUAL-STD
+      device_group:    BOR_Branch_SPA_Hub        # same as spa-single
+      policy_package:  BOR-SPA-HUB-STD-PKG        # same as spa-single
+    app:
+      offline_template: templates/bor-spa-dual.conf.j2
+      ui_role_id: "BOR + SPA Hub (dual)"
+      csv_export_folder: fmg-export/hardware-blueprints/DUAL-SPA-Hub
+    platforms: [VM, 30G, 50G, 120G]
+    # full column set = base(34) + WAN2(5) + SPA(8) = 47. Order the App emits:
+    # base 34, then the 5 WAN2 (fmg_headers_for adds dual before spa), then the 8 SPA.
+    csv_columns_added:
+      - WAN2_PORT
+      - WAN2_IP
+      - WAN2_MASK
+      - WAN2_GATEWAY
+      - MGMT_GATEWAY2
+      - HUB_LOOPBACK
+      - FABRIC_OVERLAY
+      - FABRIC_HUB_IP
+      - FABRIC_HUB_REMOTE
+      - FABRIC_POOL_START
+      - FABRIC_POOL_END
+      - FABRIC_NETWORK_ID
+      - HUB_PROPOSAL
+
+# -----------------------------------------------------------------------------
+invariants:                          # both validators assert these
+  - "Every role.fmg.template_folder exists under FMG content/templates/."
+  - "Every role.fmg.blueprint_prefix yields {prefix}-{PLATFORM} for each platform,
+     and each exists in adom-manifest.yaml blueprints."
+  - "Every role.fmg.template_group.{vm,hw} exists in adom-manifest.yaml."
+  - "Every role.fmg.policy_package and device_group exist in adom-manifest.yaml."
+  - "A role's per_device meta-vars == its csv_columns (minus the 3 structural cols
+     Serial Number/Device Blueprint/Name). App validator checks generator.py."
+  - "meta_vars.applies_to must cover every var any .j2 references (undefined = install fail)."
+  - "csv_columns order is stable across releases; changing it bumps schema_version."
+
+process:
+  add_new_role: "Daniel authors role-spec-<name>.yaml -> App adds a roles entry +
+                 schema/template/CSV/UI -> SDK adds template folder + manifest
+                 entries -> contract updated -> BOTH validators pass -> ship together."
+  validators:
+    app: "validate_contract.py — generator.py CSV headers == csv_columns here;
+          runs at CSV export + CI."
+    sdk: "adom-init boot check — manifest meta-vars/blueprints/groups == this file;
+          runs at --create-adom + CI."
+
+# -----------------------------------------------------------------------------
+# RESOLVED  (v1 FROZEN 2026-09-04 — verified against real code + templates)
+# -----------------------------------------------------------------------------
+resolved:
+  - id: 1
+    a: "platform-list.yaml stays SDK-owned; contract carries only the VM/30G/50G/120G alias."
+  - id: 2
+    a: "bor-single VM template group stays 'BOR-SINGLE-STD' (no -VM) VERBATIM — live ADOMs
+        (BOR_Customer_1, BOR_Customer_10) reference it; renaming breaks them. Normalize in
+        schema_version 2 with a migration path. See v2_backlog."
+  - id: 3
+    a: "Tenant/per-device split VERIFIED by SDK against every .j2 — all 16 tenant-marked
+        vars are tenant-scope, zero per-device usage. Split is correct as written."
+  - id: 4
+    a: "71F DROPPED from the App (personal lab device, not a product SKU with a
+        BOR-*-STD-71F blueprint). Removed from generator.py, generator_page.py, and
+        schema/variables.yaml. A future lab role can re-add via role-spec-71f-lab.yaml."
+  - id: 5
+    a: "MGMT_GATEWAY / MGMT_GATEWAY2 removal scheduled for schema_version 2 (templates
+        already don't reference them; kept blank in CSV only for partner back-compat)."
+
+# -----------------------------------------------------------------------------
+# v2 BACKLOG  (schema_version 2 — do NOT action without a role-spec / work order)
+# -----------------------------------------------------------------------------
+v2_backlog:
+  - "Normalize template group BOR-SINGLE-STD -> BOR-SINGLE-STD-VM (FMG-side alias or a
+     scripted rename migration for existing ADOMs)."
+  - "Remove legacy MGMT_GATEWAY + MGMT_GATEWAY2 columns from the CSV export."
+  - "Per-DEVICE overlay PSK: templates today use 'set psksecret {{ SEED_PSK }}' verbatim,
+     so every site in a tenant shares ONE overlay PSK (security smell). Move to a per-device
+     PSK derived from SEED_PSK + SITE_ID; needs a coordinated template + FMG-side derivation
+     change. (Flagged by SDK Claude.)"

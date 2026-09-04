@@ -329,7 +329,28 @@ def main():
                         help="Auto-create the ADOM if it doesn't exist (default: fail if ADOM missing)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print what would be done without calling FMG")
+    parser.add_argument("--skip-contract-check", action="store_true",
+                        help="Skip the pre-flight roles-and-columns contract validation "
+                             "(NOT recommended; kept for emergency use)")
     args = parser.parse_args()
+
+    # -------- Pre-flight: contract validation (fail before any FMG writes) --------
+    if not args.skip_contract_check:
+        try:
+            from content import validate_contract as _vc      # noqa: PLC0415
+        except ImportError:
+            # Fallback for when the tool is invoked outside its package layout.
+            sys.path.insert(0, str(Path(__file__).parent / "content"))
+            import validate_contract as _vc                    # type: ignore  # noqa: PLC0415
+        print("=" * 70)
+        print("Pre-flight: validating adom-manifest.yaml against vendored contract")
+        print("            (contract/roles-and-columns.yaml)")
+        print("=" * 70)
+        if not _vc.run(verbose=True):
+            print("\nADOM init aborted. Fix contract drift above, OR re-run with "
+                  "--skip-contract-check to bypass (not recommended).")
+            sys.exit(2)
+        print()
 
     init = AdomInitializer(
         host=args.fmg_host, adom=args.adom,
