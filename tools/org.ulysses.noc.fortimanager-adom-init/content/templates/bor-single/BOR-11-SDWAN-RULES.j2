@@ -1,3 +1,9 @@
+{# ---- PRIMARY_POP flip (contract v1.1) ----
+   When PRIMARY_POP=2, priority-members flips (1 2 -> 2 1) and SLA member order
+   flips so cfg-order tie-break consistently prefers the POP2 health-check.
+   Inline conditionals (not {% set %}) — FMG Jinja doesn't propagate set-bindings
+   across the config block (gotcha #20).
+#}
 config system sdwan
     config service
         edit 1
@@ -5,12 +11,12 @@ config system sdwan
             set mode sla
             set dst "RFC1918-GRP"
             set tie-break cfg-order
-            set priority-members 1 2
+            set priority-members {{ '2 1' if (PRIMARY_POP | string) == '2' else '1 2' }}
             config sla
-                edit "HC_{{ POP1_NAME }}"
+                edit "HC_{{ POP2_NAME if (PRIMARY_POP | string) == '2' else POP1_NAME }}"
                     set id 1
                 next
-                edit "HC_{{ POP2_NAME }}"
+                edit "HC_{{ POP1_NAME if (PRIMARY_POP | string) == '2' else POP2_NAME }}"
                     set id 1
                 next
             end
@@ -20,12 +26,12 @@ config system sdwan
             set mode sla
             set dst "all"
             set tie-break cfg-order
-            set priority-members 1 2
+            set priority-members {{ '2 1' if (PRIMARY_POP | string) == '2' else '1 2' }}
             config sla
-                edit "HC_{{ POP1_NAME }}"
+                edit "HC_{{ POP2_NAME if (PRIMARY_POP | string) == '2' else POP1_NAME }}"
                     set id 1
                 next
-                edit "HC_{{ POP2_NAME }}"
+                edit "HC_{{ POP1_NAME if (PRIMARY_POP | string) == '2' else POP2_NAME }}"
                     set id 1
                 next
             end

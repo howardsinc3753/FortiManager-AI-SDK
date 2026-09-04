@@ -1,9 +1,10 @@
 # =============================================================================
 # BOR Role & Column Contract  —  cross-repo source of truth
 # =============================================================================
-# schema_version: 1
 # last_updated: 2026-09-04
-# status: v1 FROZEN — App + SDK reconciled against real code + templates 2026-09-04
+# status: v1.1 — adds PRIMARY_POP (bor-single, all-traffic PoP preference).
+#   schema_version is a REAL top-level key below (promoted from a comment in v1.1 so both
+#   validators parse it directly). applies_to now accepts a role-id LIST (e.g. [bor-single]).
 #
 # PURPOSE
 #   The FortiSASE App and the FortiManager-AI-SDK describe the SAME four BOR
@@ -35,6 +36,8 @@
 #   * Meta-var + CSV-column NAMES are identical across repos. Only the role
 #     taxonomy (role/template_group/blueprint/device_group) is mapped, below.
 # =============================================================================
+
+schema_version: "1.1"
 
 naming:
   policy_packages:
@@ -108,6 +111,9 @@ meta_vars:
   POP2_NAME:           {scope: tenant,     applies_to: all}
   POP1_BOR_NODE:       {scope: tenant,     applies_to: all}
   POP2_BOR_NODE:       {scope: tenant,     applies_to: all}
+
+  # --- pop preference (v1.1; bor-single only, dual/SPA in v1.2) ---
+  PRIMARY_POP:         {scope: per_device, applies_to: [bor-single], csv: PRIMARY_POP}   # 1|2: which PoP a single-circuit site prefers for ALL traffic (private + INET)
 
   # --- bgp ---
   BGP_AS:              {scope: tenant, applies_to: all, csv: BGP_AS}          # tenant-optional
@@ -218,6 +224,8 @@ roles:
       - POP2_FQDN
       - POP1_PROBE
       - POP2_PROBE
+    csv_columns_added:   # v1.1: PRIMARY_POP (bor-single only; all-traffic PoP preference). +1 -> 35
+      - PRIMARY_POP
 
   - id: bor-dual
     name: BOR Dual-Circuit Spoke

@@ -130,14 +130,18 @@ def validate(contract: dict, manifest: dict, platforms: dict) -> list[str]:
     manifest_meta_vars = _mv_names(manifest)
     contract_meta_vars_all_scopes = set((contract.get("meta_vars") or {}).keys())
 
-    # Fallback for a role that has NO applies_to hits: use contract-wide union
+    # Every meta_var whose applies_to matches this role, regardless of scope.
+    # v1.1: applies_to accepts EITHER a keyword ("all" | "dual" | "spa") OR a
+    # list of explicit role_ids (["bor-single"] for a role-specific meta-var).
     def _contract_vars_for_role(role_id: str) -> set[str]:
-        """Every meta_var whose applies_to matches this role, regardless of scope."""
         catalog = contract.get("meta_vars") or {}
         hits = set()
         for name, spec in catalog.items():
             applies_to = (spec or {}).get("applies_to", "all")
-            if applies_to == "all":
+            if isinstance(applies_to, list):
+                if role_id in applies_to:
+                    hits.add(name)
+            elif applies_to == "all":
                 hits.add(name)
             elif applies_to == "dual" and "dual" in role_id:
                 hits.add(name)
@@ -239,13 +243,16 @@ def run(*, verbose: bool = True) -> bool:
         if verbose:
             n_roles = len(contract.get("roles") or [])
             n_meta = len(contract.get("meta_vars") or {})
-            # schema_version lives in a YAML comment today; parse it out.
-            sv = "?"
-            for line in _CONTRACT_FILE.read_text(encoding="utf-8").splitlines()[:10]:
-                m = re.match(r"#\s*schema_version:\s*(\d+)", line)
-                if m:
-                    sv = m.group(1)
-                    break
+            # v1.1: schema_version is now a real top-level YAML key. Fallback to
+            # comment-regex for backwards compat if someone re-vendors a v1 file.
+            sv = contract.get("schema_version")
+            if sv is None:
+                for line in _CONTRACT_FILE.read_text(encoding="utf-8").splitlines()[:10]:
+                    m = re.match(r"#\s*schema_version:\s*(\S+)", line)
+                    if m:
+                        sv = m.group(1)
+                        break
+                sv = sv or "?"
             print(f"[contract] GREEN - {n_roles} role(s) match contract v{sv} "
                   f"({n_meta} meta_vars declared)")
         return True

@@ -5,6 +5,12 @@ meta_vars:
 - name: ADMIN_PASSWORD
   default: FortiSASE-OnRamp-2026!
   description: Admin password (POC default; per-device via CSV)
+- name: PRIMARY_POP
+  default: '1'
+  description: >-
+    Contract v1.1 - bor-single only. Which PoP is preferred for BOTH private-access
+    AND INET traffic (1 or 2). Default 1 (byte-identical to pre-v1.1). Set to 2
+    per-site via CSV to split a fleet across PoPs and use full 2Gbps tenant capacity.
 - name: ADMIN_SPORT
   default: '10443'
   description: Admin GUI port (off 443 to avoid IKE-over-TCP conflict)
@@ -12,7 +18,7 @@ meta_vars:
   default: '480'
   description: Admin idle timeout minutes
 - name: BASTION_IP
-  default: 66.110.253.68
+  default: 203.0.113.1
   description: Mgmt/bastion return path IP
 - name: BASTION_MASK
   default: 255.255.255.255
@@ -93,7 +99,7 @@ meta_vars:
   default: '65001:10'
   description: PoP1 BGP community (preferred)
 - name: POP1_FQDN
-  default: ipsec-6rmg0ph0-mia-f3.prod.fortisase.com
+  default: ipsec-<tenant>-mia-f3.prod.fortisase.com
   description: PoP1 (Primary) FQDN - Miami
 - name: POP1_LOCAL_PREF
   default: '200'
@@ -111,7 +117,7 @@ meta_vars:
   default: '65001:20'
   description: PoP2 BGP community (backup)
 - name: POP2_FQDN
-  default: ipsec-6rmg0ph0-dfw-f3.prod.fortisase.com
+  default: ipsec-<tenant>-dfw-f3.prod.fortisase.com
   description: PoP2 (Secondary) FQDN - Dallas
 - name: POP2_LOCAL_PREF
   default: '100'
@@ -475,14 +481,14 @@ firewall_addresses:
   subnet:
   - 0.0.0.0
   - 0.0.0.0
-  fqdn: ipsec-6rmg0ph0-dfw-f3.prod.fortisase.com
+  fqdn: ipsec-<tenant>-dfw-f3.prod.fortisase.com
   allow_routing: 1
 - name: BOR_Secondary_PUBLIC
   type: 2
   subnet:
   - 0.0.0.0
   - 0.0.0.0
-  fqdn: ipsec-6rmg0ph0-mia-f3.prod.fortisase.com
+  fqdn: ipsec-<tenant>-mia-f3.prod.fortisase.com
   allow_routing: 1
 - name: LOCAL-LAN
   type: 0

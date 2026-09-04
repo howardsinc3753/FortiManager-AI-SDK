@@ -1,3 +1,15 @@
+{# ---- PRIMARY_POP flip (contract v1.1) ----
+   Per-site meta-var. When PRIMARY_POP=2, the (community, local_pref) VALUES
+   swap between the two PoP route-maps so POP2 becomes preferred for both
+   private-access AND internet-via-BOR. Route-map NAMES stay by-PoP-identity
+   (RM_OUT_<POP1_NAME>, RM_OUT_<POP2_NAME>) so BGP-neighbor bindings + install
+   history aren't churned; only values change. Default (PRIMARY_POP unset or =1)
+   is byte-identical to pre-v1.1 render.
+   NOTE: FMG's Jinja parser doesn't propagate {% set %} bindings across the
+   config block (gotcha #20). Use inline conditionals at each substitution
+   instead. Verified: FMG rejects {% set primary_comm = ... %} with
+   "variable 'primary_comm' not exist" at install-preview time.
+#}
 config router prefix-list
     edit "PL_LAN_LOCAL"
         config rule
@@ -12,8 +24,8 @@ config router route-map
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
-                set set-community "{{ POP1_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
-                set set-local-preference {{ POP1_LOCAL_PREF }}
+                set set-community "{{ POP2_COMMUNITY if (PRIMARY_POP | string) == '2' else POP1_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ POP2_LOCAL_PREF if (PRIMARY_POP | string) == '2' else POP1_LOCAL_PREF }}
             next
             edit 99
             next
@@ -23,8 +35,8 @@ config router route-map
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
-                set set-community "{{ POP2_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
-                set set-local-preference {{ POP2_LOCAL_PREF }}
+                set set-community "{{ POP1_COMMUNITY if (PRIMARY_POP | string) == '2' else POP2_COMMUNITY }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ POP1_LOCAL_PREF if (PRIMARY_POP | string) == '2' else POP2_LOCAL_PREF }}
             next
             edit 99
             next
