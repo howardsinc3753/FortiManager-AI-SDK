@@ -8,11 +8,11 @@ config system sdwan
     end
     config members
         edit 1
-            set interface "BOR_{{ POP1_NAME }}"
+            set interface "BOR_Primary"
             set zone "SDWAN_ZONE"
         next
         edit 2
-            set interface "BOR_{{ POP2_NAME }}"
+            set interface "BOR_Secondary"
             set zone "SDWAN_ZONE"
         next
         edit 3
@@ -47,7 +47,7 @@ config system sdwan
     config service
         edit 1
             set name "Private-Access"
-            set dst "RFC1918-10" "RFC1918-172" "RFC1918-192"
+            set dst "RFC1918_10" "RFC1918_172" "RFC1918_192"
             set priority-members 4
             set tie-break fib-best-match
         next

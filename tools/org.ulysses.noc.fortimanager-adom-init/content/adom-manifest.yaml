@@ -496,6 +496,27 @@ firewall_addresses:
   - $(LAN_SUBNET)
   - $(LAN_MASK)
   allow_routing: 0
+- name: RFC1918_10
+  type: 0
+  subnet:
+  - 10.0.0.0
+  - 255.0.0.0
+  allow_routing: 0
+  description: SPA hub Private-Access dst (v1.3 fidelity — matches App SPA render + live 120G-hub)
+- name: RFC1918_172
+  type: 0
+  subnet:
+  - 172.16.0.0
+  - 255.240.0.0
+  allow_routing: 0
+  description: SPA hub Private-Access dst
+- name: RFC1918_192
+  type: 0
+  subnet:
+  - 192.168.0.0
+  - 255.255.0.0
+  allow_routing: 0
+  description: SPA hub Private-Access dst
 - name: BOR_Primary1_PUBLIC
   type: 2
   fqdn: $(POP1_FQDN)

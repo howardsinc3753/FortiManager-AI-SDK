@@ -278,6 +278,14 @@ def _naming_drift_guard(role_id: str = "bor-single") -> list[str]:
         "PRIMARY_POP": "1",
         "HOSTNAME": "test-spoke", "ADMIN_PASSWORD": "test",
         "vm_interface_number": "3",
+        # dual-WAN specific
+        "WAN2_PORT": "port2", "WAN2_IP": "2.2.2.1", "WAN2_MASK": "255.255.255.0",
+        "WAN2_GATEWAY": "2.2.2.254",
+        # SPA fabric specific (bor-spa-*)
+        "FABRIC_OVERLAY": "10.10.1.0/24", "FABRIC_NETWORK_ID": "1",
+        "FABRIC_POOL_START": "10.10.1.1", "FABRIC_POOL_END": "10.10.1.252",
+        "FABRIC_HUB_IP": "10.10.1.253", "FABRIC_HUB_REMOTE": "10.10.1.254",
+        "HUB_LOOPBACK": "10.123.123.1", "HUB_PROPOSAL": "aes256-sha256",
     }
     env = Environment(loader=FileSystemLoader(str(tpl_dir)), keep_trailing_newline=True)
     # Lines that legitimately carry the sentinel: comment blocks + description strings
@@ -311,9 +319,12 @@ def run(*, verbose: bool = True) -> bool:
     drifts = validate(contract, manifest, platforms)
     # Naming-drift guard - sentinel-render each role that has been rename-audited,
     # fail if PoP name leaks into object-name context (Daniel's naming rule, 2026-09-04).
-    # bor-single: v1.1  |  bor-dual: v1.2 (already role-based, guard confirms + regressions)
+    # bor-single    : v1.1 (rename)   bor-dual        : v1.2 (already role-based)
+    # bor-spa-single: v1.3 (rename)   bor-spa-dual    : v1.3 (already role-based)
     drifts.extend(_naming_drift_guard("bor-single"))
     drifts.extend(_naming_drift_guard("bor-dual"))
+    drifts.extend(_naming_drift_guard("bor-spa-single"))
+    drifts.extend(_naming_drift_guard("bor-spa-dual"))
     if not drifts:
         if verbose:
             n_roles = len(contract.get("roles") or [])

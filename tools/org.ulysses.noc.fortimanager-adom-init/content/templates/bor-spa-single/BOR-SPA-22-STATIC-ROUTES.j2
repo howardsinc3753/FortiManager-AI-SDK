@@ -7,18 +7,18 @@ config router static
         set comment "Floating WAN default (fallback; primary via on-ramps)"
     next
     edit 20
-        set dstaddr "BOR_{{ POP1_NAME }}_PUBLIC"
+        set dstaddr "BOR_Primary_PUBLIC"
 {% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
 {% else %}        set dynamic-gateway enable
 {% endif %}        set device "{{ WAN_PORT }}"
-        set comment "{{ POP1_NAME }} BOR PoP public via WAN"
+        set comment "BOR Primary PoP public via WAN ({{ POP1_NAME }})"
     next
     edit 21
-        set dstaddr "BOR_{{ POP2_NAME }}_PUBLIC"
+        set dstaddr "BOR_Secondary_PUBLIC"
 {% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
 {% else %}        set dynamic-gateway enable
 {% endif %}        set device "{{ WAN_PORT }}"
-        set comment "{{ POP2_NAME }} BOR PoP public via WAN"
+        set comment "BOR Secondary PoP public via WAN ({{ POP2_NAME }})"
     next
     edit 10
         set dst {{ BASTION_IP }} {{ BASTION_MASK }}
