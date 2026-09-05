@@ -1,5 +1,5 @@
 config vpn ipsec phase1-interface
-    edit "BOR_{{ POP1_NAME }}"
+    edit "BOR_Primary"
         set type ddns
         set interface "{{ WAN_PORT }}"
         set ike-version 2
@@ -16,7 +16,7 @@ config vpn ipsec phase1-interface
         set remotegw-ddns "{{ POP1_FQDN }}"
         set psksecret {{ SEED_PSK }}
     next
-    edit "BOR_{{ POP2_NAME }}"
+    edit "BOR_Secondary"
         set type ddns
         set interface "{{ WAN_PORT }}"
         set ike-version 2
@@ -35,13 +35,13 @@ config vpn ipsec phase1-interface
     next
 end
 config vpn ipsec phase2-interface
-    edit "BOR_{{ POP1_NAME }}"
-        set phase1name "BOR_{{ POP1_NAME }}"
+    edit "BOR_Primary"
+        set phase1name "BOR_Primary"
         set proposal {{ ONRAMP_PROPOSAL }}
         set dhgrp {{ ONRAMP_DHGRP }}
     next
-    edit "BOR_{{ POP2_NAME }}"
-        set phase1name "BOR_{{ POP2_NAME }}"
+    edit "BOR_Secondary"
+        set phase1name "BOR_Secondary"
         set proposal {{ ONRAMP_PROPOSAL }}
         set dhgrp {{ ONRAMP_DHGRP }}
     next

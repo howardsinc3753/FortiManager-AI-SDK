@@ -1,8 +1,8 @@
-{# ---- PRIMARY_POP flip (contract v1.1) ----
-   When PRIMARY_POP=2, priority-members flips (1 2 -> 2 1) and SLA member order
-   flips so cfg-order tie-break consistently prefers the POP2 health-check.
-   Inline conditionals (not {% set %}) — FMG Jinja doesn't propagate set-bindings
-   across the config block (gotcha #20).
+{# ---- PRIMARY_POP flip (contract v1.1) + role-based naming (v1.1 naming fix) ----
+   HC names are LITERAL role strings (HC_Primary/HC_Secondary) — universal across
+   tenants. When PRIMARY_POP=2, priority-members flips (1 2 -> 2 1) and SLA member
+   order flips so cfg-order tie-break consistently prefers the Secondary HC.
+   Inline conditionals only (FMG Jinja doesn't propagate {% set %} — gotcha #20).
 #}
 config system sdwan
     config service
@@ -13,10 +13,10 @@ config system sdwan
             set tie-break cfg-order
             set priority-members {{ '2 1' if (PRIMARY_POP | string) == '2' else '1 2' }}
             config sla
-                edit "HC_{{ POP2_NAME if (PRIMARY_POP | string) == '2' else POP1_NAME }}"
+                edit "{{ 'HC_Secondary' if (PRIMARY_POP | string) == '2' else 'HC_Primary' }}"
                     set id 1
                 next
-                edit "HC_{{ POP1_NAME if (PRIMARY_POP | string) == '2' else POP2_NAME }}"
+                edit "{{ 'HC_Primary' if (PRIMARY_POP | string) == '2' else 'HC_Secondary' }}"
                     set id 1
                 next
             end
@@ -28,10 +28,10 @@ config system sdwan
             set tie-break cfg-order
             set priority-members {{ '2 1' if (PRIMARY_POP | string) == '2' else '1 2' }}
             config sla
-                edit "HC_{{ POP2_NAME if (PRIMARY_POP | string) == '2' else POP1_NAME }}"
+                edit "{{ 'HC_Secondary' if (PRIMARY_POP | string) == '2' else 'HC_Primary' }}"
                     set id 1
                 next
-                edit "HC_{{ POP1_NAME if (PRIMARY_POP | string) == '2' else POP2_NAME }}"
+                edit "{{ 'HC_Primary' if (PRIMARY_POP | string) == '2' else 'HC_Secondary' }}"
                     set id 1
                 next
             end

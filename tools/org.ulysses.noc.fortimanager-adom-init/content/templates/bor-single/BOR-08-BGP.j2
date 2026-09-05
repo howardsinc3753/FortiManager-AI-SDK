@@ -1,14 +1,14 @@
-{# ---- PRIMARY_POP flip (contract v1.1) ----
-   Per-site meta-var. When PRIMARY_POP=2, the (community, local_pref) VALUES
-   swap between the two PoP route-maps so POP2 becomes preferred for both
-   private-access AND internet-via-BOR. Route-map NAMES stay by-PoP-identity
-   (RM_OUT_<POP1_NAME>, RM_OUT_<POP2_NAME>) so BGP-neighbor bindings + install
-   history aren't churned; only values change. Default (PRIMARY_POP unset or =1)
-   is byte-identical to pre-v1.1 render.
-   NOTE: FMG's Jinja parser doesn't propagate {% set %} bindings across the
-   config block (gotcha #20). Use inline conditionals at each substitution
-   instead. Verified: FMG rejects {% set primary_comm = ... %} with
-   "variable 'primary_comm' not exist" at install-preview time.
+{# ---- PRIMARY_POP flip (contract v1.1) + role-based object names (v1.1 naming fix) ----
+   Object names are LITERAL role strings (BOR_Primary/BOR_Secondary, RM_OUT_PRIMARY/
+   RM_OUT_SECONDARY) — stable across every tenant regardless of PoP identity, so a
+   multi-tenant NOC reads them universally.  POP1_NAME/POP2_NAME are DISPLAY identity
+   only (used in `set comment` for human context).
+   When PRIMARY_POP=2, the (community, local_pref) VALUES swap between the two PoP
+   route-maps so POP2 becomes preferred for both private-access AND INET.  The
+   route-map NAMES don't change on the flip — only the values inside; BGP-neighbor
+   bindings never churn.
+   NOTE: FMG's Jinja parser doesn't propagate {% set %} bindings across the config
+   block (gotcha #20). Use inline conditionals at each substitution instead.
 #}
 config router prefix-list
     edit "PL_LAN_LOCAL"
@@ -20,7 +20,7 @@ config router prefix-list
     next
 end
 config router route-map
-    edit "RM_OUT_{{ POP1_NAME | upper }}"
+    edit "RM_OUT_PRIMARY"
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
@@ -31,7 +31,7 @@ config router route-map
             next
         end
     next
-    edit "RM_OUT_{{ POP2_NAME | upper }}"
+    edit "RM_OUT_SECONDARY"
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
@@ -65,8 +65,8 @@ config router bgp
     set graceful-restart enable
     config neighbor
         edit "{{ POP1_BOR_NODE }}"
-            set interface "BOR_{{ POP1_NAME }}"
-            set update-source "BOR_{{ POP1_NAME }}"
+            set interface "BOR_Primary"
+            set update-source "BOR_Primary"
             set remote-as {{ BGP_AS }}
             set advertisement-interval 1
             set connect-timer 1
@@ -75,12 +75,12 @@ config router bgp
             set next-hop-self enable
             set soft-reconfiguration enable
             set route-map-out "RM_OUT_FAIL"
-            set route-map-out-preferable "RM_OUT_{{ POP1_NAME | upper }}"
+            set route-map-out-preferable "RM_OUT_PRIMARY"
             set send-community both
         next
         edit "{{ POP2_BOR_NODE }}"
-            set interface "BOR_{{ POP2_NAME }}"
-            set update-source "BOR_{{ POP2_NAME }}"
+            set interface "BOR_Secondary"
+            set update-source "BOR_Secondary"
             set remote-as {{ BGP_AS }}
             set advertisement-interval 1
             set connect-timer 1
@@ -89,7 +89,7 @@ config router bgp
             set next-hop-self enable
             set soft-reconfiguration enable
             set route-map-out "RM_OUT_FAIL"
-            set route-map-out-preferable "RM_OUT_{{ POP2_NAME | upper }}"
+            set route-map-out-preferable "RM_OUT_SECONDARY"
             set send-community both
         next
     end

@@ -8,27 +8,27 @@ config router static
     next
     edit 5
         set dst {{ POP1_BOR_NODE }} 255.255.255.255
-        set device "BOR_{{ POP1_NAME }}"
-        set comment "BOR {{ POP1_NAME }} node (BGP peer)"
+        set device "BOR_Primary"
+        set comment "BOR Primary node (BGP peer, {{ POP1_NAME }} PoP)"
     next
     edit 6
         set dst {{ POP2_BOR_NODE }} 255.255.255.255
-        set device "BOR_{{ POP2_NAME }}"
-        set comment "BOR {{ POP2_NAME }} node (BGP peer)"
+        set device "BOR_Secondary"
+        set comment "BOR Secondary node (BGP peer, {{ POP2_NAME }} PoP)"
     next
     edit 20
-        set dstaddr "BOR_{{ POP1_NAME }}_PUBLIC"
+        set dstaddr "BOR_Primary_PUBLIC"
 {% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
 {% else %}        set dynamic-gateway enable
 {% endif %}        set device "{{ WAN_PORT }}"
-        set comment "{{ POP1_NAME }} BOR PoP public via WAN"
+        set comment "BOR Primary PoP public via WAN ({{ POP1_NAME }})"
     next
     edit 21
-        set dstaddr "BOR_{{ POP2_NAME }}_PUBLIC"
+        set dstaddr "BOR_Secondary_PUBLIC"
 {% if WAN_MODE == "static" %}        set gateway {{ WAN_GATEWAY }}
 {% else %}        set dynamic-gateway enable
 {% endif %}        set device "{{ WAN_PORT }}"
-        set comment "{{ POP2_NAME }} BOR PoP public via WAN"
+        set comment "BOR Secondary PoP public via WAN ({{ POP2_NAME }})"
     next
     edit 10
         set dst {{ BASTION_IP }} {{ BASTION_MASK }}

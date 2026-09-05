@@ -233,12 +233,85 @@ def validate(contract: dict, manifest: dict, platforms: dict) -> list[str]:
     return drifts
 
 
+def _naming_drift_guard(role_id: str = "bor-single") -> list[str]:
+    """Render bor-single templates with a SENTINEL PoP identity and confirm the
+    sentinel doesn't leak into any object name (only allowed in comments /
+    descriptions). Fails loud if a template regresses to var-derived naming.
+
+    Object names must be LITERAL role strings (BOR_Primary, HC_Primary, etc.);
+    POP1_NAME / POP2_NAME are display identity only. This guard catches the
+    exact drift Daniel called out on 2026-09-04 (BOR_DFW leaking into device DB
+    because template rendered `edit "BOR_{{ POP1_NAME }}"`).
+    """
+    drifts: list[str] = []
+    try:
+        from jinja2 import Environment, FileSystemLoader   # noqa: PLC0415
+    except ImportError:
+        return []      # jinja2 optional; skip guard if not installed
+
+    tpl_dir = _CONTENT_DIR / "templates" / role_id
+    if not tpl_dir.is_dir():
+        return [f"[naming-drift] template folder missing: {tpl_dir}"]
+
+    SENTINEL_1 = "NAMINGDRIFT1"
+    SENTINEL_2 = "NAMINGDRIFT2"
+    ctx = {
+        "POP1_NAME": SENTINEL_1, "POP2_NAME": SENTINEL_2,
+        "POP1_FQDN": "example-primary.example.com",
+        "POP2_FQDN": "example-secondary.example.com",
+        "POP1_PROBE": "8.8.8.8", "POP2_PROBE": "8.8.4.4",
+        "POP1_BOR_NODE": "10.10.1.1", "POP2_BOR_NODE": "10.10.2.1",
+        "POP1_COMMUNITY": "65001:10", "POP2_COMMUNITY": "65001:20",
+        "POP1_LOCAL_PREF": "200", "POP2_LOCAL_PREF": "195",
+        "FAIL_COMMUNITY": "65001:99", "FAIL_LOCAL_PREF": "50",
+        "WAN_PORT": "port1", "WAN_MODE": "static",
+        "WAN_IP": "1.1.1.1", "WAN_MASK": "255.255.255.0", "WAN_GATEWAY": "1.1.1.254",
+        "LAN_IP": "10.1.1.1", "LAN_MASK": "255.255.255.0",
+        "LAN_SUBNET": "10.1.1.0", "LAN_PORT": "port2",
+        "SITE_ID": "1", "ROUTER_ID": "10.1.1.1",
+        "BGP_AS": "65001", "BGP_KEEPALIVE": "2", "BGP_HOLDTIME": "6",
+        "SLA_LATENCY_MS": "250", "SLA_JITTER_MS": "50", "SLA_PKTLOSS_PCT": "2",
+        "BASTION_IP": "10.30.99.99", "BASTION_MASK": "255.255.255.255",
+        "SEED_PSK": "test-psk",
+        "ONRAMP_PROPOSAL": "aes256-sha256", "ONRAMP_DHGRP": "5 14",
+        "ONRAMP_NETWORK_ID": "0",
+        "PRIMARY_POP": "1",
+        "HOSTNAME": "test-spoke", "ADMIN_PASSWORD": "test",
+        "vm_interface_number": "3",
+    }
+    env = Environment(loader=FileSystemLoader(str(tpl_dir)), keep_trailing_newline=True)
+    # Lines that legitimately carry the sentinel: comment blocks + description strings
+    _COMMENT_RE = re.compile(
+        r'^\s*(?:#|!|set\s+(?:comment|description|comments|desc)\s+)',
+        re.IGNORECASE,
+    )
+    for tpl_path in sorted(tpl_dir.rglob("*.j2")):
+        try:
+            body = env.get_template(tpl_path.name).render(**ctx)
+        except Exception as e:
+            drifts.append(f"[naming-drift] {tpl_path.name} render failed: {type(e).__name__}: {e}")
+            continue
+        for lineno, line in enumerate(body.splitlines(), 1):
+            if SENTINEL_1 not in line and SENTINEL_2 not in line:
+                continue
+            if _COMMENT_RE.match(line):
+                continue  # allowed: comment / description
+            drifts.append(
+                f"[naming-drift] {tpl_path.name}:{lineno} - sentinel PoP name leaked "
+                f"into an object-name context: {line.strip()[:120]}"
+            )
+    return drifts
+
+
 def run(*, verbose: bool = True) -> bool:
     """Load + validate. Returns True on GREEN. Prints a report either way."""
     contract = load_contract()
     manifest = load_manifest()
     platforms = load_platform_list()
     drifts = validate(contract, manifest, platforms)
+    # Naming-drift guard - sentinel-render bor-single, fail if PoP name leaks
+    # into object-name context (Daniel's naming rule, 2026-09-04).
+    drifts.extend(_naming_drift_guard("bor-single"))
     if not drifts:
         if verbose:
             n_roles = len(contract.get("roles") or [])

@@ -8,11 +8,11 @@ config system sdwan
     end
     config members
         edit 1
-            set interface "BOR_{{ POP1_NAME }}"
+            set interface "BOR_Primary"
             set zone "SDWAN_ZONE"
         next
         edit 2
-            set interface "BOR_{{ POP2_NAME }}"
+            set interface "BOR_Secondary"
             set zone "SDWAN_ZONE"
         next
         edit 3
@@ -22,7 +22,7 @@ config system sdwan
 {% endif %}        next
     end
     config health-check
-        edit "HC_{{ POP1_NAME }}"
+        edit "HC_Primary"
             set server "{{ POP1_PROBE }}"
             set failtime 2
             set recoverytime 3
@@ -36,7 +36,7 @@ config system sdwan
                 next
             end
         next
-        edit "HC_{{ POP2_NAME }}"
+        edit "HC_Secondary"
             set server "{{ POP2_PROBE }}"
             set failtime 2
             set recoverytime 3
@@ -54,12 +54,12 @@ config system sdwan
     config neighbor
         edit "{{ POP1_BOR_NODE }}"
             set member 1
-            set health-check "HC_{{ POP1_NAME }}"
+            set health-check "HC_Primary"
             set sla-id 1
         next
         edit "{{ POP2_BOR_NODE }}"
             set member 2
-            set health-check "HC_{{ POP2_NAME }}"
+            set health-check "HC_Secondary"
             set sla-id 1
         next
     end
