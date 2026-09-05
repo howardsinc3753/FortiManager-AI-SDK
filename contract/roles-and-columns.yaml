@@ -2,7 +2,7 @@
 # BOR Role & Column Contract  —  cross-repo source of truth
 # =============================================================================
 # last_updated: 2026-09-04
-# status: v1.1 — adds PRIMARY_POP (bor-single, all-traffic PoP preference).
+# status: v1.2 — PRIMARY_POP extends to bor-dual (dual alt-primary); role-based naming on dual.
 #   schema_version is a REAL top-level key below (promoted from a comment in v1.1 so both
 #   validators parse it directly). applies_to now accepts a role-id LIST (e.g. [bor-single]).
 #
@@ -37,7 +37,7 @@
 #     taxonomy (role/template_group/blueprint/device_group) is mapped, below.
 # =============================================================================
 
-schema_version: "1.1"
+schema_version: "1.2"
 
 naming:
   policy_packages:
@@ -113,7 +113,7 @@ meta_vars:
   POP2_BOR_NODE:       {scope: tenant,     applies_to: all}
 
   # --- pop preference (v1.1; bor-single only, dual/SPA in v1.2) ---
-  PRIMARY_POP:         {scope: per_device, applies_to: [bor-single], csv: PRIMARY_POP}   # 1|2: which PoP a single-circuit site prefers for ALL traffic (private + INET)
+  PRIMARY_POP:         {scope: per_device, applies_to: [bor-single, bor-dual], csv: PRIMARY_POP}   # 1|2: which PoP the site prefers for ALL traffic (private + INET); single v1.1, dual v1.2
 
   # --- bgp ---
   BGP_AS:              {scope: tenant, applies_to: all, csv: BGP_AS}          # tenant-optional
@@ -248,6 +248,7 @@ roles:
       - WAN2_MASK
       - WAN2_GATEWAY
       - MGMT_GATEWAY2
+      - PRIMARY_POP        # v1.2: dual alt-primary (34 base + 5 WAN2 + PRIMARY_POP = 40)
 
   - id: bor-spa-single
     name: BOR + SPA Hub (single-circuit)

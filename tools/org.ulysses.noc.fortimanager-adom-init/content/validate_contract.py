@@ -309,9 +309,11 @@ def run(*, verbose: bool = True) -> bool:
     manifest = load_manifest()
     platforms = load_platform_list()
     drifts = validate(contract, manifest, platforms)
-    # Naming-drift guard - sentinel-render bor-single, fail if PoP name leaks
-    # into object-name context (Daniel's naming rule, 2026-09-04).
+    # Naming-drift guard - sentinel-render each role that has been rename-audited,
+    # fail if PoP name leaks into object-name context (Daniel's naming rule, 2026-09-04).
+    # bor-single: v1.1  |  bor-dual: v1.2 (already role-based, guard confirms + regressions)
     drifts.extend(_naming_drift_guard("bor-single"))
+    drifts.extend(_naming_drift_guard("bor-dual"))
     if not drifts:
         if verbose:
             n_roles = len(contract.get("roles") or [])

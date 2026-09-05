@@ -7,13 +7,25 @@ config router prefix-list
         end
     next
 end
+{# ---- PRIMARY_POP flip (contract v1.2) - DUAL case ----
+   When PRIMARY_POP=2, the (community, local_pref) VALUES swap at the GROUP level:
+   Primary group (Primary1/Primary2) trades with Secondary group (Secondary1/Secondary2)
+   so the Secondary group becomes preferred for BOTH private-access AND INET.
+   Route-map NAMES stay (RM_OUT_PRIMARY1/2/SECONDARY1/2) so BGP-neighbor bindings +
+   install history never churn; only the values inside change.
+   Community + LP values are BGP-tag POSITIONAL CONSTANTS (matches App generator's
+   AS:(10k) / lp = 200 - (k-1)*5 formula), so they render as literals from within
+   the conditional branches - not tenant-configurable in either codepath.
+   NOTE: FMG Jinja doesn't propagate {% set %} bindings across the config block
+   (gotcha #20). Inline conditionals only.
+#}
 config router route-map
     edit "RM_OUT_PRIMARY1"
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
-                set set-community "65001:10" "65001:{{ 1000 + (SITE_ID | int) }}"
-                set set-local-preference 200
+                set set-community "{{ '65001:30' if (PRIMARY_POP | string) == '2' else '65001:10' }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ 190 if (PRIMARY_POP | string) == '2' else 200 }}
             next
             edit 99
             next
@@ -23,8 +35,8 @@ config router route-map
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
-                set set-community "65001:20" "65001:{{ 1000 + (SITE_ID | int) }}"
-                set set-local-preference 195
+                set set-community "{{ '65001:40' if (PRIMARY_POP | string) == '2' else '65001:20' }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ 185 if (PRIMARY_POP | string) == '2' else 195 }}
             next
             edit 99
             next
@@ -34,8 +46,8 @@ config router route-map
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
-                set set-community "65001:30" "65001:{{ 1000 + (SITE_ID | int) }}"
-                set set-local-preference 190
+                set set-community "{{ '65001:10' if (PRIMARY_POP | string) == '2' else '65001:30' }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ 200 if (PRIMARY_POP | string) == '2' else 190 }}
             next
             edit 99
             next
@@ -45,8 +57,8 @@ config router route-map
         config rule
             edit 1
                 set match-ip-address "PL_LAN_LOCAL"
-                set set-community "65001:40" "65001:{{ 1000 + (SITE_ID | int) }}"
-                set set-local-preference 185
+                set set-community "{{ '65001:20' if (PRIMARY_POP | string) == '2' else '65001:40' }}" "65001:{{ 1000 + (SITE_ID | int) }}"
+                set set-local-preference {{ 195 if (PRIMARY_POP | string) == '2' else 185 }}
             next
             edit 99
             next

@@ -1,3 +1,11 @@
+{# ---- PRIMARY_POP flip (contract v1.2) - DUAL 4-tunnel case ----
+   When PRIMARY_POP=2, priority-members reorders (1 2 3 4 -> 3 4 1 2) so the
+   Secondary GROUP (members 3 & 4) leads for BOTH private-access AND INET.
+   SLA member order flips the same way so cfg-order tie-break consistently
+   prefers the Secondary group's health-checks.
+   Inline conditionals only - FMG Jinja doesn't propagate {% set %} bindings
+   across the config block (gotcha #20).
+#}
 config system sdwan
     config service
         edit 1
@@ -5,18 +13,18 @@ config system sdwan
             set mode sla
             set dst "RFC1918-GRP"
             set tie-break cfg-order
-            set priority-members 1 2 3 4
+            set priority-members {{ '3 4 1 2' if (PRIMARY_POP | string) == '2' else '1 2 3 4' }}
             config sla
-                edit "HC_Primary1"
+                edit "{{ 'HC_Secondary1' if (PRIMARY_POP | string) == '2' else 'HC_Primary1' }}"
                     set id 1
                 next
-                edit "HC_Primary2"
+                edit "{{ 'HC_Secondary2' if (PRIMARY_POP | string) == '2' else 'HC_Primary2' }}"
                     set id 1
                 next
-                edit "HC_Secondary1"
+                edit "{{ 'HC_Primary1' if (PRIMARY_POP | string) == '2' else 'HC_Secondary1' }}"
                     set id 1
                 next
-                edit "HC_Secondary2"
+                edit "{{ 'HC_Primary2' if (PRIMARY_POP | string) == '2' else 'HC_Secondary2' }}"
                     set id 1
                 next
             end
@@ -26,18 +34,18 @@ config system sdwan
             set mode sla
             set dst "all"
             set tie-break cfg-order
-            set priority-members 1 2 3 4
+            set priority-members {{ '3 4 1 2' if (PRIMARY_POP | string) == '2' else '1 2 3 4' }}
             config sla
-                edit "HC_Primary1"
+                edit "{{ 'HC_Secondary1' if (PRIMARY_POP | string) == '2' else 'HC_Primary1' }}"
                     set id 1
                 next
-                edit "HC_Primary2"
+                edit "{{ 'HC_Secondary2' if (PRIMARY_POP | string) == '2' else 'HC_Primary2' }}"
                     set id 1
                 next
-                edit "HC_Secondary1"
+                edit "{{ 'HC_Primary1' if (PRIMARY_POP | string) == '2' else 'HC_Secondary1' }}"
                     set id 1
                 next
-                edit "HC_Secondary2"
+                edit "{{ 'HC_Primary2' if (PRIMARY_POP | string) == '2' else 'HC_Secondary2' }}"
                     set id 1
                 next
             end
