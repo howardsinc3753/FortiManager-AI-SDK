@@ -481,15 +481,17 @@ firewall_addresses:
   subnet:
   - 0.0.0.0
   - 0.0.0.0
-  fqdn: ipsec-<tenant>-dfw-f3.prod.fortisase.com
+  fqdn: $(POP1_FQDN)
   allow_routing: 1
+  description: FMG-var reference; resolved per-device at install time via POP1_FQDN meta-var (was literal ipsec-<tenant>-... which failed XSS filter; matched by BOR_Primary1/2_PUBLIC dual siblings)
 - name: BOR_Secondary_PUBLIC
   type: 2
   subnet:
   - 0.0.0.0
   - 0.0.0.0
-  fqdn: ipsec-<tenant>-mia-f3.prod.fortisase.com
+  fqdn: $(POP2_FQDN)
   allow_routing: 1
+  description: FMG-var reference; resolved per-device at install time via POP2_FQDN meta-var
 - name: LOCAL-LAN
   type: 0
   subnet:

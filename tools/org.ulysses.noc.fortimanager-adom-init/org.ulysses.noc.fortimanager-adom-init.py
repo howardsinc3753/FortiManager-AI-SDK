@@ -352,6 +352,37 @@ def main():
             sys.exit(2)
         print()
 
+    # -------- Pre-flight: tenant-FQDN gate (refuses <tenant> placeholder) --------
+    # Gotcha #21 catch-early: FMG's XSS filter rejects '<'/'>' with a cryptic
+    # datasrc error. This gate catches "user forgot to fill in tenant FQDN" +
+    # produces a clear message BEFORE any FMG write. Not bypassed by any flag -
+    # a placeholder FQDN can't produce a working config, so there's no legit
+    # reason to skip.
+    try:
+        from content import validate_contract as _vc         # noqa: PLC0415
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).parent / "content"))
+        import validate_contract as _vc                       # type: ignore  # noqa: PLC0415
+    print("=" * 70)
+    print("Pre-flight: tenant-FQDN gate")
+    print("            (refuses '<tenant>' placeholder in POP*_FQDN or address FQDN)")
+    print("=" * 70)
+    _content_dir = Path(__file__).parent / "content"
+    _manifest = yaml.safe_load((_content_dir / "adom-manifest.yaml").read_text(encoding="utf-8"))
+    _tenant_cfg: dict | None = None
+    if args.tenant_config:
+        _tenant_cfg = yaml.safe_load(Path(args.tenant_config).read_text(encoding="utf-8"))
+    _fqdn_errors = _vc.tenant_fqdn_gate(_tenant_cfg, _manifest)
+    if _fqdn_errors:
+        print("[tenant-fqdn-gate] RED - unresolved '<tenant>' placeholders:")
+        for e in _fqdn_errors:
+            print(f"  - {e}")
+        print("\nADOM init aborted. Fix the placeholder(s) above; see "
+              "content/tenant-defaults.example.yaml for the FQDN pattern.")
+        sys.exit(3)
+    print("[tenant-fqdn-gate] GREEN - no unresolved '<tenant>' placeholders")
+    print()
+
     init = AdomInitializer(
         host=args.fmg_host, adom=args.adom,
         tenant_config_path=args.tenant_config,

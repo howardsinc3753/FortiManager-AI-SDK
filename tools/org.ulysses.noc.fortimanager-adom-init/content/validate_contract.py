@@ -311,6 +311,68 @@ def _naming_drift_guard(role_id: str = "bor-single") -> list[str]:
     return drifts
 
 
+def tenant_fqdn_gate(tenant_config: dict | None, manifest: dict) -> list[str]:
+    """Refuse an adom-init run if any FQDN meta-var or firewall_address FQDN still
+    holds the literal '<tenant>' placeholder (or any '<'/'>' char that FMG's XSS
+    filter will reject). Catches the "user forgot to fill in tenant FQDN" case
+    BEFORE we push anything to FMG - turns the cryptic FMG XSS error into a
+    clear "enter your real FortiSASE tenant FQDN" message.
+
+    Reframes gotcha #21: '<tenant>' is a SENTINEL meaning "no real FQDN entered."
+    A config carrying it is INCOMPLETE and should never install. Don't make the
+    sentinel pass the filter - refuse the run + tell the user clearly.
+
+    Returns a list of error messages. Empty list = OK to proceed.
+    """
+    errors: list[str] = []
+    _tenant_effective: dict[str, str] = {}     # resolved value per FQDN meta-var
+
+    # 1. Collect FQDN defaults from the manifest meta_vars catalog
+    for v in (manifest.get("meta_vars") or []):
+        if not isinstance(v, dict):
+            continue
+        name = v.get("name") or ""
+        if name.endswith("_FQDN") and v.get("default"):
+            _tenant_effective[name] = str(v["default"])
+
+    # 2. Overlay tenant-config values (if provided)
+    if tenant_config:
+        for k, val in tenant_config.items():
+            if k.endswith("_FQDN") and val is not None:
+                _tenant_effective[k] = str(val)
+
+    # 3. Flag any resolved FQDN still carrying the sentinel
+    for var, val in _tenant_effective.items():
+        if "<" in val or ">" in val:
+            errors.append(
+                f"[tenant-fqdn-gate] {var} = '{val}' still contains a '<tenant>' "
+                "placeholder. Enter your real FortiSASE BOR PoP FQDN "
+                "(e.g. ipsec-abc123-dfw-f3.prod.fortisase.com) in your "
+                "--tenant-config YAML before greenfield adom-init."
+            )
+
+    # 4. Also flag manifest firewall_addresses whose literal fqdn still carries
+    #    a placeholder (adom-init will try to push these literally - FMG rejects
+    #    them with a cryptic XSS error). Skip $()-syntax (FMG meta-var refs get
+    #    resolved at install time; those are fine).
+    for a in (manifest.get("firewall_addresses") or []):
+        if not isinstance(a, dict):
+            continue
+        fqdn = a.get("fqdn") or ""
+        if not fqdn or fqdn.startswith("$("):
+            continue
+        if "<" in fqdn or ">" in fqdn:
+            errors.append(
+                f"[tenant-fqdn-gate] manifest firewall_address '{a.get('name')}' "
+                f"fqdn = '{fqdn}' contains a '<tenant>' placeholder. "
+                "Either (a) fix the manifest to use $(POP1_FQDN) FMG-var reference, "
+                "or (b) put a real FQDN in the manifest default; adom-init cannot "
+                "push a placeholder to FMG (XSS filter rejects '<'/'>' chars)."
+            )
+
+    return errors
+
+
 def run(*, verbose: bool = True) -> bool:
     """Load + validate. Returns True on GREEN. Prints a report either way."""
     contract = load_contract()
