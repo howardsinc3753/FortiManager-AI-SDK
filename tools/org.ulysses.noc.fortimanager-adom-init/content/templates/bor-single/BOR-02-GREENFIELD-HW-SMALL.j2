@@ -1,3 +1,11 @@
+{# Greenfield purge for small HW (30G/50G).
+   MUST run at position 0 of the HW template group: real 30G/50G ship with a
+   factory `lan -> wan` firewall policy that registers `wan` as a policy
+   dstintf, which collides with the sdwan-member datasrc validator. Purging
+   the factory policy first is what lets `set interface "wan"` under
+   `config system sdwan / config members` validate cleanly. (gotcha #23)
+   Every stanza below is idempotent: safe on both fresh factory devices AND
+   re-installs where the entries no longer exist. #}
 config firewall policy
     purge
 end
@@ -5,6 +13,8 @@ config system dhcp server
     purge
 end
 config firewall address
+    edit "lan"
+    next
     delete "lan"
 end
 config system virtual-switch

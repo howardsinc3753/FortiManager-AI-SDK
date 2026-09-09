@@ -221,7 +221,14 @@ template_groups:
   - BOR-11-SDWAN-RULES
 - name: BOR-SINGLE-STD-HW
   description: FortiSASE BOR single circuit shared HW template group used by 30G, 50G, 120G blueprints
+  # GREENFIELD-HW-SMALL at position 0 is REQUIRED for real HW (gotcha #23): factory
+  # `lan -> wan` firewall policy on 30G/50G registers `wan` as a policy dstintf,
+  # which then collides with the sdwan-member datasrc validator when the SDWAN
+  # template does `set interface "wan"`. Purging the factory policy first
+  # deregisters `wan` -> sdwan-member=wan validates fine. VMs never fail this
+  # (no factory policy) which is why the VM group has no purge equivalent.
   members:
+  - BOR-02-GREENFIELD-HW-SMALL
   - BOR-01-SYSTEM-GLOBAL
   - BOR-03-INTERFACES-HW
   - BOR-04-ZONE-LAN
@@ -232,7 +239,9 @@ template_groups:
   - BOR-11-SDWAN-RULES
 - name: BOR-SPA-SINGLE-STD-HW
   description: SPA hub single circuit for HW 30G 50G 120G - Extreme Fork isolation from spoke
+  # GREENFIELD-HW-SMALL at position 0 required for real HW - see gotcha #23.
   members:
+  - BOR-02-GREENFIELD-HW-SMALL
   - BOR-SPA-01-SYSTEM-GLOBAL
   - BOR-SPA-03-INTERFACES-HW
   - BOR-SPA-04-ZONE-LAN
@@ -267,7 +276,9 @@ template_groups:
   - BOR-DUAL-11-SDWAN-RULES
 - name: BOR-DUAL-STD-HW
   description: BOR dual circuit spoke for 30G 50G 120G HW
+  # GREENFIELD-HW-SMALL at position 0 required for real HW - see gotcha #23.
   members:
+  - BOR-02-GREENFIELD-HW-SMALL
   - BOR-DUAL-01-SYSTEM-GLOBAL
   - BOR-DUAL-03-INTERFACES-HW
   - BOR-DUAL-04-ZONE-LAN
@@ -290,7 +301,9 @@ template_groups:
   - BOR-SPA-DUAL-24-SDWAN
 - name: BOR-SPA-DUAL-STD-HW
   description: BOR SPA hub dual circuit for 30G 50G 120G HW Extreme Fork
+  # GREENFIELD-HW-SMALL at position 0 required for real HW - see gotcha #23.
   members:
+  - BOR-02-GREENFIELD-HW-SMALL
   - BOR-SPA-DUAL-01-SYSTEM-GLOBAL
   - BOR-SPA-DUAL-03-INTERFACES-HW
   - BOR-SPA-DUAL-04-ZONE-LAN

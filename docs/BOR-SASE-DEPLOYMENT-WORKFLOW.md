@@ -461,7 +461,7 @@ config router bgp
 
 ---
 
-## 10. FMG 7.6 Gotcha Catalog (22 gotchas, all with resolutions)
+## 10. FMG 7.6 Gotcha Catalog (23 gotchas, all with resolutions)
 
 Every gotcha below cost hours on a real deployment. Each has a fix baked into the current tool + templates.
 
@@ -526,6 +526,10 @@ Every gotcha below cost hours on a real deployment. Each has a fix baked into th
 ### Template Naming Fidelity
 
 **#22 — bor-*/bor-spa-single object-name drift (BOR_DFW instead of BOR_Primary)** — Templates rendered `edit "BOR_{{ POP1_NAME }}"` → tenant-identity names in device DB. Multi-tenant NOC hostile (operator has to memorize per-tenant PoP mappings). Fix (v1.1 for bor-single, v1.3 for bor-spa-single): all object names rendered as literal role strings (`BOR_Primary`, `HC_Secondary`, `RM_OUT_PRIMARY`, `BOR_Primary_PUBLIC`); `POP1_NAME`/`POP2_NAME` moved to `set comment` for display only. Naming-drift guard in validator prevents regression.
+
+### Factory-Policy Collision (real-HW only)
+
+**#23 — Factory `lan → wan` policy collides with sdwan-member validator on real HW** — Real FortiGate 30G/50G/120G ship from the factory with a firewall policy `srcintf=lan dstintf=wan action=accept`. That policy registers `wan` as a firewall-policy dstintf. When the SDWAN template renders `set interface "wan"` under `config system sdwan / config members`, FMG's install-check datasrc validator sees the dual registration and rejects with `datasrc invalid. object: system sdwan members.N:interface. detail: wan. reason: invalid value - prop[interface]: firewall policy dstintf`. VMs never hit this because their factory default uses `port1/port2` not `wan/lan`. Long-hidden by our matrix: we developed on VMs, hit the reject only when a real 30G was imported. Fix: `BOR-02-GREENFIELD-HW-SMALL` (which does `config firewall policy / purge`) must sit at **position 0** of every HW template group (`BOR-SINGLE-STD-HW`, `BOR-DUAL-STD-HW`, `BOR-SPA-SINGLE-STD-HW`, `BOR-SPA-DUAL-STD-HW`). The template exists in the manifest but for a long stretch was NOT bound into the group members list — that's the actual gap this fixed. The template is now idempotent (`edit "lan" / next / delete "lan"` guards against `Entry does not exist` on re-install after the address is already purged). Verified end-to-end 2026-09-09 on fresh FGT50GTK26048289 (real 50G, WAN_PORT=wan, never GUI-touched): install/device + install/package + install/device re-sync all green; SDWAN member 5 = wan / Underlay_ZONE clean.
 
 ---
 
