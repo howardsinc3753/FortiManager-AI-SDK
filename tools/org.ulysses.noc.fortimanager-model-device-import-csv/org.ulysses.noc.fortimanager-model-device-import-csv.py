@@ -472,23 +472,60 @@ def _do_auto_bind(
     return out
 
 
-async def _poll_task(client: FortiManagerClient, task_id: int, max_wait: int) -> tuple[str, int, str]:
+# v1.3.0: FMG add-dev-list task lines carry the real failure reason as a '|'-joined
+# token string, e.g. 'devsnexist1|FGT50GTK26048289|devsnexist2'. Translate the
+# tokens we know; always fall back to the raw detail so nothing is silently dropped.
+_FMG_TASK_TOKENS: Dict[str, str] = {
+    "devsnexist": ("serial {sn} is already registered on this FortiManager (in another ADOM). "
+                   "FortiManager registers a serial once - delete the device from its home ADOM "
+                   "first, or import into that ADOM."),
+    "devnameexist": "a device named '{name}' already exists in ADOM {adom}.",
+}
+
+
+def _explain_task_detail(detail: str, name: str, sn: str, adom: str) -> str:
+    d = (detail or "").strip()
+    for tok, msg in _FMG_TASK_TOKENS.items():
+        if tok in d:
+            return msg.format(name=name, sn=sn, adom=adom)
+    return d or "FMG task reported an error with no detail"
+
+
+async def _poll_task(client: FortiManagerClient, task_id: int, max_wait: int) -> tuple[str, int, str, Dict[str, str]]:
+    """Poll until terminal. Returns (state, num_err, last_task_history_line, per_line_errors)
+    where per_line_errors maps the task line name (the device name for add-dev-list) to
+    FMG's detail string for every line that reported an error. v1.3.0: previously only the
+    task-level history was read, which is empty for add-dev-list failures - the reason lives
+    on line[].detail / line[].err - so failures surfaced as a bare task_state=error."""
     start = time.monotonic()
     state = "pending"
     num_err = 0
     last_line = ""
+    line_errors: Dict[str, str] = {}
     while time.monotonic() - start < max_wait:
         r = client.get(f"/task/task/{task_id}", verbose=1)
-        data = r.get("result", [{}])[0].get("data") or {}
+        res0 = r.get("result", [{}])[0] or {}
+        st = res0.get("status") or {}
+        if st.get("code") not in (0, None):
+            # v1.3.0: a denied/failed task read is not a timeout - stop spinning and say so.
+            return "error", max(num_err, 1), f"task read failed: {st.get('message')}", line_errors
+        data = res0.get("data") or {}
         state = _norm_state(data.get("state"))
         num_err = int(data.get("num_err") or 0)
         history = data.get("history") or []
         if history:
             last_line = str(history[-1].get("detail") or "")[:200]
+        for ln in data.get("line") or []:
+            if int(ln.get("err") or 0) != 0 or _norm_state(ln.get("state")) == "error":
+                det = str(ln.get("detail") or "")
+                if not det:
+                    lh = ln.get("history") or []
+                    det = str(lh[-1].get("detail") or "") if lh else ""
+                line_errors[str(ln.get("name") or "")] = det[:300]
         if state in _TERMINAL:
-            return state, num_err, last_line
+            return state, num_err, last_line, line_errors
         await asyncio.sleep(2)
-    return state, num_err, last_line
+    return state, num_err, last_line, line_errors
 
 
 async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -632,8 +669,9 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
 
         task_state = "pending"
         task_err = ""
+        line_errors: Dict[str, str] = {}
         if wait and task_id is not None:
-            task_state, num_err, last_line = await _poll_task(client, task_id, max_wait)
+            task_state, num_err, last_line, line_errors = await _poll_task(client, task_id, max_wait)
             if num_err and last_line:
                 task_err = f"errs={num_err}: {last_line}"
 
@@ -651,6 +689,24 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
                 "oid": probe_data.get("oid"),
                 "in_dvm": probe_status.get("code") == 0,
             }
+            # v1.3.0: the probe is by NAME. If a device of that name already existed with a
+            # different serial, the import row failed but the probe finds the OTHER box -
+            # do not report it as created (and never rename it below).
+            probed_sn = str(probe_data.get("sn") or "")
+            if record["in_dvm"] and probed_sn and probed_sn != entry["sn"]:
+                record["in_dvm"] = False
+                record["existing_sn"] = probed_sn
+                record["error"] = (f"name collision: a device named '{entry['name']}' already exists in "
+                                   f"ADOM {adom} with serial {probed_sn} (this CSV row has {entry['sn']}).")
+            if not record["in_dvm"] and "error" not in record:
+                det = line_errors.get(entry["name"]) or next(
+                    (v for k, v in line_errors.items() if entry["name"] and entry["name"] in k), "")
+                if det or task_state == "error":
+                    record["error"] = _explain_task_detail(det, entry["name"], entry["sn"], adom)
+                    if det:
+                        record["fmg_detail"] = det
+                else:
+                    record["error"] = "device not found in DVM after import (task reported no error)"
             # v1.2.0: set hostname to name so FMG display + policy header don't
             # show the raw SN until the first install refreshes it.
             if record["in_dvm"] and set_hostname_from_name:
@@ -664,6 +720,10 @@ async def execute(params: Dict[str, Any]) -> Dict[str, Any]:
 
         overall_ok = (len(failed) == 0) and (task_state == "done")
         action = "imported" if overall_ok else ("partial" if created else "failed")
+        if failed and not task_err:
+            # v1.3.0: add-dev-list failures leave the task-level history empty; surface the
+            # per-device reasons at top level too so callers that only read `error` see them.
+            task_err = "; ".join(f"{f['name']}: {f.get('error')}" for f in failed[:5])
 
         # v1.1.0: auto-bind — opt-in via auto_bind dict.
         # Only run when the import succeeded (partial/failed = skip; user should

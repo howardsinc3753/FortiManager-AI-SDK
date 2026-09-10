@@ -147,6 +147,33 @@ All 4 steps happen in ONE tool call. Install is unblocked.
 {"success": false, "action": "partial", ..., "devices_created": [...], "devices_failed": [{...}]}
 ```
 
+**Failed rows carry the reason (v1.3.0).** FMG's `add-dev-list` puts the real failure on the task's per-device line (`line[].err` / `line[].detail`), not in the task-level history. Pre-1.3.0 that was dropped and a failure surfaced as a bare `task_state: "error"`. Now every entry in `devices_failed[]` has an `error` (plain English), the raw FMG token string in `fmg_detail` when there is one, and the top-level `error` repeats the per-device reasons. The two cases you will actually hit:
+
+```json
+{
+  "success": false, "action": "failed", "task_state": "error",
+  "error": "spoke-1: serial FGT50GTK26048289 is already registered on this FortiManager (in another ADOM). FortiManager registers a serial once - delete the device from its home ADOM first, or import into that ADOM.",
+  "devices_failed": [
+    {"name": "spoke-1", "sn": "FGT50GTK26048289", "blueprint": "BOR-SINGLE-STD-50G", "oid": null, "in_dvm": false,
+     "error": "serial FGT50GTK26048289 is already registered on this FortiManager (in another ADOM). ...",
+     "fmg_detail": "devsnexist1|FGT50GTK26048289|devsnexist2"}
+  ]
+}
+```
+
+```json
+{
+  "success": false, "action": "failed",
+  "devices_failed": [
+    {"name": "spoke-1", "sn": "FGT50GTK99000097", "blueprint": "BOR-SINGLE-STD-50G", "oid": 674, "in_dvm": false,
+     "existing_sn": "FGT50GTK99000098",
+     "error": "name collision: a device named 'spoke-1' already exists in ADOM BOR_Customer_1 with serial FGT50GTK99000098 (this CSV row has FGT50GTK99000097)."}
+  ]
+}
+```
+
+The second case is caught by the post-import probe comparing the probed device's serial to the CSV row (FMG itself emits no token for a name collision). The existing device is left untouched - it is never reported as created and its hostname is never rewritten.
+
 ## Example
 
 Minimal — CSV only, no auto-bind:
@@ -203,6 +230,9 @@ Live-tested 2026-08-25 on `BOR_Customer_1` importing spoke-2 (SN FGVMMLTM2601204
 | `FMG exec error: {'code': -20084, ...}` | VM SN not FortiFlex-validated | Use a real FortiFlex-issued VM serial |
 | `FMG exec error: {'code': -3, ...}` | ADOM or blueprint doesn't exist | Verify ADOM + blueprint names |
 | `partial` action with `task_state: warning` | Some rows failed FMG-side | Inspect `devices_failed[]` + FMG task log |
+| `devices_failed[].fmg_detail` contains `devsnexist` | **v1.3.0** - serial already registered on this FMG, in another ADOM (FMG registers a serial once) | Delete the device from its home ADOM, or import into that ADOM. The MSSP Deploy page's `locate_serials` pre-flight catches this before import and names the home ADOM. |
+| `devices_failed[].existing_sn` present | **v1.3.0** - name collision: that name already exists in the ADOM with a different serial | Rename the CSV row, or delete the existing device. The existing device is untouched. |
+| `error: "task read failed: ..."` | **v1.3.0** - FMG refused the task poll (perms/session) - not a timeout | Check API user rights on `/task/task`; re-run |
 
 ## Pairs With
 
