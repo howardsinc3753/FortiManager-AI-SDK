@@ -161,7 +161,7 @@ config router bgp
         edit 2
             set prefix {{ LAN_SUBNET }} {{ LAN_MASK }}
         next
-{% if HUB_LOOPBACK %}        edit 3
+{% if HUB_LOOPBACK is defined and HUB_LOOPBACK %}        edit 3
             set prefix {{ HUB_LOOPBACK }} 255.255.255.255
         next
 {% endif %}    end

@@ -461,7 +461,7 @@ config router bgp
 
 ---
 
-## 10. FMG 7.6 Gotcha Catalog (23 gotchas, all with resolutions)
+## 10. FMG 7.6 Gotcha Catalog (24 gotchas, all with resolutions)
 
 Every gotcha below cost hours on a real deployment. Each has a fix baked into the current tool + templates.
 
@@ -530,6 +530,10 @@ Every gotcha below cost hours on a real deployment. Each has a fix baked into th
 ### Factory-Policy Collision (real-HW only)
 
 **#23 — Factory `lan → wan` policy collides with sdwan-member validator on real HW** — Real FortiGate 30G/50G/120G ship from the factory with a firewall policy `srcintf=lan dstintf=wan action=accept`. That policy registers `wan` as a firewall-policy dstintf. When the SDWAN template renders `set interface "wan"` under `config system sdwan / config members`, FMG's install-check datasrc validator sees the dual registration and rejects with `datasrc invalid. object: system sdwan members.N:interface. detail: wan. reason: invalid value - prop[interface]: firewall policy dstintf`. VMs never hit this because their factory default uses `port1/port2` not `wan/lan`. Long-hidden by our matrix: we developed on VMs, hit the reject only when a real 30G was imported. Fix: `BOR-02-GREENFIELD-HW-SMALL` (which does `config firewall policy / purge`) must sit at **position 0** of every HW template group (`BOR-SINGLE-STD-HW`, `BOR-DUAL-STD-HW`, `BOR-SPA-SINGLE-STD-HW`, `BOR-SPA-DUAL-STD-HW`). The template exists in the manifest but for a long stretch was NOT bound into the group members list — that's the actual gap this fixed. The template is now idempotent (`edit "lan" / next / delete "lan"` guards against `Entry does not exist` on re-install after the address is already purged). Verified end-to-end 2026-09-09 on fresh FGT50GTK26048289 (real 50G, WAN_PORT=wan, never GUI-touched): install/device + install/package + install/device re-sync all green; SDWAN member 5 = wan / Underlay_ZONE clean.
+
+### Optional Meta Vars
+
+**#24 — Empty-string meta var is `undefined` to FMG's Jinja; `{% if VAR %}` raises** — FMG resolves a meta var whose effective value is the empty string (ADOM default `''`, or a per-device mapping of `''`) as *undefined*, and its Jinja raises `parse cli template fail: 'VAR' is undefined` on ANY reference, including the test expression of an `{% if %}`. Python Jinja2 would treat it as falsy and skip the block, so a template that renders fine offline fails at FMG install-preview. First hit on `HUB_LOOPBACK` (SPA hub, per-device, intentionally blank when the engineer doesn't want a loopback): `{% if HUB_LOOPBACK %}` failed on both the unmapped and the explicit-`''` device. Gotcha #19 (`MGMT_GATEWAY`) was the same mechanism seen earlier and solved by deleting the branch; this is the general fix. Rule: **guard every optional meta var with `{% if VAR is defined and VAR %}`**. Verified 2026-09-10 against FMG 7.6.7 on a throwaway SPA hub: `is defined and VAR`, `VAR | default('')`, and `VAR is defined` all parse and skip the block on blank; the `is defined and VAR` form is used because it reads as intent and also rejects a defined-but-empty value if FMG ever changes the empty-string semantics. The CSV importer skips blank cells (no per-device mapping is written), so the real-world path is the unmapped case. Applied to `BOR-SPA-20-LOOPBACK`, `BOR-SPA-23-BGP-RR` and their `BOR-SPA-DUAL-*` twins.
 
 ---
 
