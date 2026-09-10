@@ -27,7 +27,7 @@ Use this tool when:
 
 ## Interpreting Results
 
-### Success (live smoke against `184.73.7.106`, ADOM `BOR_Customer_1`)
+### Success (live smoke against `fmg.example.com`, ADOM `BOR_Customer_1`)
 ```json
 {
   "success": true,
@@ -79,7 +79,7 @@ Use this tool when:
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-cli-template-create/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "name": "bgp-underlay-v1",
         "script": (
@@ -103,7 +103,7 @@ execute_certified_tool(
 **Jinja variant:**
 ```python
 {
-    "fmg_host": "184.73.7.106",
+    "fmg_host": "fmg.example.com",
     "adom": "Acme",
     "name": "ipsec-branch",
     "script": open("branch.j2").read(),

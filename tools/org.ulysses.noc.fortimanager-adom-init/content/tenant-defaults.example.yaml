@@ -23,7 +23,7 @@ POP1_FQDN: "ipsec-<your-tenant-id>-mia-f3.prod.fortisase.com"
 POP2_FQDN: "ipsec-<your-tenant-id>-dfw-f3.prod.fortisase.com"
 
 # --- Static / typically-shared values (rarely change per tenant) ---
-BASTION_IP: "66.110.253.68"
+BASTION_IP: "203.0.113.1"
 BASTION_MASK: "255.255.255.255"
 BGP_AS: "65001"
 BGP_HOLDTIME: "6"

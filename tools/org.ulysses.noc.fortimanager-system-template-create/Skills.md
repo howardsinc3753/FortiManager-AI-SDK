@@ -25,7 +25,7 @@ Use this tool when:
 
 ## Interpreting Results
 
-### Created (real smoke-test output against 184.73.7.106, ADOM `BOR_Customer_1`)
+### Created (real smoke-test output against fmg.example.com, ADOM `BOR_Customer_1`)
 
 ```json
 {
@@ -65,7 +65,7 @@ Use this tool when:
 **Field meanings:**
 - `action` — `created` (new template), `updated` (existed + overwrite), `noop` (existed + no overwrite)
 - `endpoint_used` — the devprof URL layout FMG actually accepted. The tool tries
-  `/pm/config/adom/{adom}/devprof` first; FMG 7.4 / 7.6 (validated against 184.73.7.106)
+  `/pm/config/adom/{adom}/devprof` first; FMG 7.4 / 7.6 (validated against fmg.example.com)
   rejects that path with code -3 "Object does not exist" and the tool falls back to
   `/pm/devprof/adom/{adom}`. Downstream tools (child templates: DNS, NTP, admin,
   syslog, SNMP) should key off this so they hit the matching family.
@@ -77,14 +77,14 @@ The tool sets this automatically; callers only need to supply `name` (and option
 
 ## Example
 
-**User:** "Create a system template called `bor-branch-std` in the `BOR_Customer_1` ADOM on 184.73.7.106, and update it if it's already there."
+**User:** "Create a system template called `bor-branch-std` in the `BOR_Customer_1` ADOM on fmg.example.com, and update it if it's already there."
 
 **Tool call:**
 ```python
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-system-template-create/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "name": "bor-branch-std",
         "description": "Standard BOR branch device profile",

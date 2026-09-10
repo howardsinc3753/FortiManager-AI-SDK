@@ -107,7 +107,7 @@ proves the discovery path fails cleanly with a caller-actionable message.
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-template-bind-to-device/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "template_type": "sdwan",
         "template_name": "bor-tenant1-tpl",

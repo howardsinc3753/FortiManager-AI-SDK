@@ -8,7 +8,7 @@ first-class provisioning template that wraps zones, members, health-checks,
 service rules and BGP-on-Lo neighbors, and binds onto managed FortiGates
 (30G/50G/120G/VM) via a Model Device.
 
-FMG 7.6 endpoint layout (discovered against 184.73.7.106):
+FMG 7.6 endpoint layout (discovered against fmg.example.com):
 
   Shell (create / list / delete):
     /pm/wanprof/adom/{adom}                     (collection — `add`, `get`)
@@ -246,7 +246,7 @@ def main(context) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     import json
-    host = sys.argv[1] if len(sys.argv) > 1 else "184.73.7.106"
+    host = sys.argv[1] if len(sys.argv) > 1 else "fmg.example.com"
     print(json.dumps(asyncio.run(execute({
         "fmg_host": host,
         "adom": "BOR_Customer_1",

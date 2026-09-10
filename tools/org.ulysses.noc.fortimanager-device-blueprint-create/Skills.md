@@ -91,7 +91,7 @@ Build the same blueprint the FMG GUI creates when SE clicks "Create New" → pic
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-device-blueprint-create/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "name": "BOR-SINGLE-STD-50G",
         "platform": "FortiGate-50G",

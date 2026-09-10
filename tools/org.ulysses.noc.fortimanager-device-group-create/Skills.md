@@ -84,7 +84,7 @@ To confirm after running: **FMG GUI → Device Manager → {ADOM} → Device Gro
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-device-group-create/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "name": "BOR_Branch_Single",
         "desc": "Single-BOR branches (one WAN + one SASE tunnel per site)",
@@ -96,7 +96,7 @@ execute_certified_tool(
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-device-group-create/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "name": "BOR_Branch_Dual",
         "desc": "Dual-BOR branches (two WAN + two SASE tunnels per site)",

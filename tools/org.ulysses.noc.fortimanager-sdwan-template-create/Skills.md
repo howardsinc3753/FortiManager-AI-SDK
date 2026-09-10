@@ -39,7 +39,7 @@ like `$(HUB1_LO)` pass through intact.
 
 ## Interpreting Results
 
-### Created (real smoke-test output against 184.73.7.106, ADOM `BOR_Customer_1`)
+### Created (real smoke-test output against fmg.example.com, ADOM `BOR_Customer_1`)
 
 ```json
 {
@@ -120,7 +120,7 @@ failed while keeping the ones that succeeded:
 
 ## Example
 
-**User:** "Create an SD-WAN template `bor-spoke-tpl` in `BOR_Customer_1` on 184.73.7.106.
+**User:** "Create an SD-WAN template `bor-spoke-tpl` in `BOR_Customer_1` on fmg.example.com.
 Zones: `SDWAN-HUB` (ADVPN on) and `SDWAN-WAN`. One HUB member at seq 500 on interface
 `HUB1-VPN1` sourced from `$(LOOPBACK_IP)`; wan at seq 2. Health-check `Public_SLA`
 against 8.8.8.8 / 4.2.2.2 tied to seq 2. Update if it already exists."
@@ -130,7 +130,7 @@ against 8.8.8.8 / 4.2.2.2 tied to seq 2. Update if it already exists."
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-sdwan-template-create/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "name": "bor-spoke-tpl",
         "status": "enable",

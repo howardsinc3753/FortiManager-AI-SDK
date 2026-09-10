@@ -40,7 +40,7 @@ from fortimanager_client import FortiManagerClient  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# stype -> numeric prefix, observed from GUI blueprint create curl on 184.73.7.106
+# stype -> numeric prefix, observed from GUI blueprint create curl on fmg.example.com
 # devprof (System) and wanprof (SDWAN) DON'T live under /pm/template/adom/, so their
 # prefixes are hardcoded here. The /pm/template/ family entries use "4-N" pattern
 # where N is a stype-specific id.

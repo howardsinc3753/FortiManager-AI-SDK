@@ -154,7 +154,7 @@ Minimal — CSV only, no auto-bind:
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-model-device-import-csv/1.1.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "csv_path": "C:/Users/howar/Downloads/customer_101_deploy.csv",
         "wait": True,
@@ -168,7 +168,7 @@ Full auto-bind — CSV + attach to all tenant-scale infrastructure in one shot:
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-model-device-import-csv/1.2.1",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "csv_path": "C:/Users/howar/Downloads/spoke-N.fmg.csv",
         "auto_bind": {

@@ -244,7 +244,7 @@ def main(context) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     import json
-    host = sys.argv[1] if len(sys.argv) > 1 else "184.73.7.106"
+    host = sys.argv[1] if len(sys.argv) > 1 else "fmg.example.com"
     # Smoke: create BOR_Branch_Single + BOR_Branch_Dual in BOR_Customer_1, seed spoke-1 into Single
     print("--- BOR_Branch_Single (with spoke-1) ---")
     print(json.dumps(asyncio.run(execute({

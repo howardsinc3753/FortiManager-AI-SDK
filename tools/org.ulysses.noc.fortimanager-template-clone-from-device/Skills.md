@@ -100,7 +100,7 @@ Endpoint discovered via FMG GUI curl capture 2026-08-25.
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-template-clone-from-device/1.2.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "device": "spoke-1",
         "vdom": "root",

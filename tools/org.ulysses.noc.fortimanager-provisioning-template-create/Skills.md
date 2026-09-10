@@ -96,37 +96,37 @@ Only the **unified** `/pm/template/{stype}/adom/{adom}` endpoint family. In FMG 
 
 ```python
 # 1. System Template (dedicated tool — devprof)
-system_template_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+system_template_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                         "name": "BOR-SYSTEM", "description": "hostname/DNS/NTP/syslog"})
 
 # 2. CLI Templates for anything Jinja-driven (LAN interfaces, admin, etc.)
-cli_template_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+cli_template_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                      "name": "BOR-LAN-INTF", "script": "config system interface\n  edit \"lan\"\n    …\nend\n"})
 
 # 3. IPsec Tunnel Template (THIS tool)
-provisioning_template_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+provisioning_template_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                               "name": "BOR-IPSEC", "stype": "ipsec",
                               "revision_note": "Branch OnRamp IPsec base"})
 
 # 4. BGP Template (THIS tool)
-provisioning_template_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+provisioning_template_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                               "name": "BOR-BGP", "stype": "bgp"})
 
 # 5. Static Route Template (THIS tool)
-provisioning_template_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+provisioning_template_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                               "name": "BOR-STATIC", "stype": "static-route"})
 
 # 6. SDWAN Template shell (dedicated tool — wanprof)
-sdwan_template_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+sdwan_template_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                        "name": "BOR-SDWAN", "status": "enable"})
 
 # 7. CLI Template Group bundle (dedicated tool)
-cli_template_group_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+cli_template_group_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                            "name": "BOR-CLI-GROUP",
                            "members": ["BOR-LAN-INTF"]})
 
 # 8. Model Device with everything attached inline via blueprint
-model_device_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+model_device_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                      "name": "spoke-01", "sn": "FGT50GTK…", "platform": "FortiGate-50G",
                      "templates": ["BOR-CLI-GROUP"],
                      "meta_variables": {"SITE_ID": "1", "LAN_SUBNET": "10.1.0.0/24"}})

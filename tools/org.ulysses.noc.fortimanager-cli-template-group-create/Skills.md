@@ -30,7 +30,7 @@ shape internally. Order is preserved verbatim — do not sort.
 
 ## Interpreting Results
 
-### Created (live smoke against FMG 184.73.7.106)
+### Created (live smoke against FMG fmg.example.com)
 ```json
 {
   "success": true,
@@ -43,7 +43,7 @@ shape internally. Order is preserved verbatim — do not sort.
 }
 ```
 
-### Updated (re-run with overwrite=true, live smoke against FMG 184.73.7.106)
+### Updated (re-run with overwrite=true, live smoke against FMG fmg.example.com)
 ```json
 {
   "success": true,
@@ -93,14 +93,14 @@ shape internally. Order is preserved verbatim — do not sort.
 
 ## Example
 
-**User:** "Build the SD-WAN provisioning group on FMG 184.73.7.106 in ADOM BOR_Customer_1 with the standard 6 templates in order"
+**User:** "Build the SD-WAN provisioning group on FMG fmg.example.com in ADOM BOR_Customer_1 with the standard 6 templates in order"
 
 **Tool call:**
 ```python
 execute_certified_tool(
     canonical_id="org.ulysses.noc.fortimanager-cli-template-group-create/1.0.0",
     parameters={
-        "fmg_host": "184.73.7.106",
+        "fmg_host": "fmg.example.com",
         "adom": "BOR_Customer_1",
         "name": "bor-sdwan-build",
         "members": ["system", "interface", "static", "ipsec", "bgp", "sdwan"],

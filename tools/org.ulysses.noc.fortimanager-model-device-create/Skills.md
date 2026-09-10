@@ -120,9 +120,9 @@ blueprint:
 
 ```python
 # 1. Ensure metadata vars exist (referenced by CLI templates via $(VAR))
-metadata_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+metadata_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                  "name": "SITE_ID", "value": ""})
-metadata_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
+metadata_create({"fmg_host": "fmg.example.com", "adom": "BOR_Customer_1",
                  "name": "LAN_SUBNET", "value": "10.0.0.0/24"})
 
 # 2. Author CLI templates (System, Interface, BGP, IPsec, SDWAN) — see cli-template-create
@@ -131,7 +131,7 @@ metadata_create({"fmg_host": "184.73.7.106", "adom": "BOR_Customer_1",
 
 # 4. Create model device with template group + policy pkg attached inline
 model_device_create({
-    "fmg_host": "184.73.7.106",
+    "fmg_host": "fmg.example.com",
     "adom": "BOR_Customer_1",
     "name": "spoke-05",
     "sn": "FGT50GTK26048289",

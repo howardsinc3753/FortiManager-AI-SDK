@@ -162,20 +162,20 @@ Happens when device isn't a scope member of any pkg — usually indicates a conf
 ```bash
 # Real install (default: step 1 + auto-discovered step 2)
 python org.ulysses.noc.fortimanager-install-push.py \
-    --fmg-host 184.73.7.106 \
+    --fmg-host fmg.example.com \
     --adom BOR_Customer_10 \
     --device spoke-2
 
 # Preview only (no device-DB commit; step 1 + step 2 both validated)
 python org.ulysses.noc.fortimanager-install-push.py \
-    --fmg-host 184.73.7.106 \
+    --fmg-host fmg.example.com \
     --adom BOR_Customer_10 \
     --device spoke-2 \
     --preview-only
 
 # Device-scope only (skip pkg — config change is CLI-template-only)
 python org.ulysses.noc.fortimanager-install-push.py \
-    --fmg-host 184.73.7.106 \
+    --fmg-host fmg.example.com \
     --adom BOR_Customer_10 \
     --device spoke-2 \
     --skip-pkg
@@ -183,7 +183,7 @@ python org.ulysses.noc.fortimanager-install-push.py \
 # Deploy all 4 dual devices (loop from shell)
 for dev in spoke-dual-30g spoke-dual-50g spoke-dual-vm spa-hub-dual-120g; do
     python org.ulysses.noc.fortimanager-install-push.py \
-        --fmg-host 184.73.7.106 --adom BOR_Customer_10 --device "$dev"
+        --fmg-host fmg.example.com --adom BOR_Customer_10 --device "$dev"
 done
 ```
 
